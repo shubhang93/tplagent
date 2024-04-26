@@ -19,13 +19,15 @@ func (provTmpl *Renderer) Render(staticData any) error {
 		if err != nil {
 			return fmt.Errorf("error creating dest file:%w", err)
 		}
+		defer fi.Close()
 		return execTempl(provTmpl.Templ, fi, staticData)
 
 	}
-	fi, err := os.OpenFile(provTmpl.WriteTo, os.O_TRUNC, 0755)
+	fi, err := os.OpenFile(provTmpl.WriteTo, os.O_TRUNC|os.O_WRONLY, 0755)
 	if err != nil {
 		return fmt.Errorf("error opening dest file:%w", err)
 	}
+	defer fi.Close()
 	return execTempl(provTmpl.Templ, fi, staticData)
 }
 
