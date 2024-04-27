@@ -1,4 +1,4 @@
-package providers
+package tplactions
 
 import "fmt"
 
@@ -8,7 +8,7 @@ type MakeFunc func() Interface
 
 func Register(name string, maker MakeFunc) {
 	if _, ok := Registry[name]; ok {
-		panic(fmt.Sprintf("provider %s already exists", name))
+		panic(fmt.Sprintf("action %s already exists", name))
 	}
 	Registry[name] = maker
 }

@@ -1,6 +1,7 @@
-package templ
+package render
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,12 +16,12 @@ type staticData struct {
 	Name string
 }
 
-func TestRenderer_Render(t *testing.T) {
+func TestSink_Render(t *testing.T) {
+	tmp := t.TempDir()
 	t.Run("render when dest file does not exist", func(t *testing.T) {
 
-		tmp := t.TempDir()
 		renderPath := fmt.Sprintf("%s/test.render", tmp)
-		rdr := Renderer{
+		rdr := Sink{
 			Templ:   testTmpl,
 			WriteTo: renderPath,
 		}
@@ -48,22 +49,31 @@ func TestRenderer_Render(t *testing.T) {
 			t.Errorf("expected %s got %s", expectedContents, string(bs))
 		}
 
+		expectedErr := os.ErrNotExist
+		_, err = os.Open(fi.Name() + ".bak")
+		if !errors.Is(err, expectedErr) {
+			t.Errorf("expected error:%v got %v", expectedErr, err)
+			return
+		}
+
 	})
 
 	t.Run("dest file already exists", func(t *testing.T) {
-		tmp := t.TempDir()
 		renderPath := fmt.Sprintf("%s/%s", tmp, "test.render")
 		fi, err := os.Create(renderPath)
 		if err != nil {
 			t.Errorf("file create error:%v", err)
 			return
 		}
-		_, err = fi.WriteString("Name: foo")
+
+		expectedBackupContent := "Name: foo"
+
+		_, err = fi.WriteString(expectedBackupContent)
 		if err != nil {
 			t.Errorf("write error:%v", err)
 			return
 		}
-		rdr := Renderer{
+		rdr := Sink{
 			Templ:   testTmpl,
 			WriteTo: renderPath,
 		}
@@ -89,6 +99,34 @@ func TestRenderer_Render(t *testing.T) {
 			t.Errorf("expected:%s got:%s", expectedContent, string(bs))
 		}
 
+		bs, err = os.ReadFile(renderPath + ".bak")
+		if err != nil {
+			t.Errorf("error reading backup:%v", err)
+			return
+		}
+
+		if string(bs) != expectedBackupContent {
+			t.Errorf("expected backup content: %s\n got:%s\n", expectedBackupContent, string(bs))
+		}
+
+		// just to verify it rename
+		// replaces the backup file
+		// if one exists
+		if err := os.Rename(renderPath, renderPath+".bak"); err != nil {
+			t.Errorf("failed to rename:%v", err)
+		}
+	})
+
+	t.Run("create intermediate paths if none exists", func(t *testing.T) {
+		dest := fmt.Sprintf("%s/%s/%s", tmp, "extradir", "test.render")
+		s := Sink{
+			Templ:   template.Must(template.New("test").Parse(`Name:{{.Name}}`)),
+			WriteTo: dest,
+		}
+		err := s.Render(staticData{Name: "foo"})
+		if err != nil {
+			t.Errorf("render error:%v", err)
+		}
 	})
 
 }

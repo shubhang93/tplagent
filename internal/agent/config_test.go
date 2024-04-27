@@ -14,15 +14,15 @@ type sampleConfig struct {
 	URL       string `json:"url"`
 	AuthToken string `json:"auth_token"`
 }
-type sampleProvider struct {
+type sampleActions struct {
 	sc *sampleConfig
 }
 
-func (s *sampleProvider) FuncMap() template.FuncMap {
+func (s *sampleActions) FuncMap() template.FuncMap {
 	return make(template.FuncMap)
 }
 
-func (s *sampleProvider) SetConfig(bb []byte) error {
+func (s *sampleActions) SetConfig(bb []byte) error {
 	var sc sampleConfig
 	err := json.Unmarshal(bb, &sc)
 	if err != nil {
@@ -42,11 +42,10 @@ func Test_readConfig(t *testing.T) {
   "templates": {
     "test-config": {
       "refresh_interval": "10s",
-      "before_render_cmd": "echo \"hello\"",
-      "after_render_cmd": "echo \"rendererd\"",
+      "exec_cmd": "echo \"rendererd\"",
       "source": "/etc/tmpl/test.tmpl",
       "destination": "/etc/config/test.cfg",
-      "providers": [
+      "actions": [
         {
           "name": "test_provider",
           "config": {
@@ -57,8 +56,7 @@ func Test_readConfig(t *testing.T) {
     },
     "test-config2": {
       "refresh_interval": "5s",
-      "before_render_cmd": "echo \"hello\"",
-      "after_render_cmd": "echo \"rendererd\"",
+      "exec_cmd": "echo \"rendererd\"",
       "source": "/etc/tmpl/test.tmpl",
       "destination": "/etc/config/test.cfg"
     }
@@ -66,18 +64,17 @@ func Test_readConfig(t *testing.T) {
 }
 `
 		expectedConfig := Config{
-			Agent: Agent{
+			Agent: AgentConfig{
 				LogLevel: slog.LevelError,
 				LogFmt:   "json",
 			},
-			Templates: map[string]Template{
+			TemplateSpecs: map[string]*TemplateConfig{
 				"test-config": {
-					RefreshInterval: RefreshInterval(10 * time.Second),
-					BeforeRenderCMD: `echo "hello"`,
-					AfterRenderCMD:  `echo "rendererd"`,
+					RefreshInterval: Duration(10 * time.Second),
+					ExecCMD:         `echo "rendererd"`,
 					Source:          "/etc/tmpl/test.tmpl",
 					Destination:     "/etc/config/test.cfg",
-					Providers: []Provider{
+					Actions: []ActionConfig{
 						{
 							Name: "test_provider",
 							Config: json.RawMessage(`{
@@ -87,9 +84,8 @@ func Test_readConfig(t *testing.T) {
 					},
 				},
 				"test-config2": {
-					RefreshInterval: RefreshInterval(5 * time.Second),
-					BeforeRenderCMD: `echo "hello"`,
-					AfterRenderCMD:  `echo "rendererd"`,
+					RefreshInterval: Duration(5 * time.Second),
+					ExecCMD:         `echo "rendererd"`,
 					Source:          "/etc/tmpl/test.tmpl",
 					Destination:     "/etc/config/test.cfg",
 				},
@@ -108,17 +104,17 @@ func Test_readConfig(t *testing.T) {
 
 	t.Run("test config validation", func(t *testing.T) {
 		c := &Config{
-			Agent: Agent{
+			Agent: AgentConfig{
 				LogLevel: slog.LevelError,
 				LogFmt:   "xml",
 			},
-			Templates: map[string]Template{
+			TemplateSpecs: map[string]*TemplateConfig{
 				"templ-conf": {
-					RefreshInterval: RefreshInterval(500 * time.Millisecond),
-					Providers:       []Provider{{}},
+					RefreshInterval: Duration(500 * time.Millisecond),
+					Actions:         []ActionConfig{{}},
 				},
 				"templ-conf2": {
-					RefreshInterval: RefreshInterval(1 * time.Second),
+					RefreshInterval: Duration(1 * time.Second),
 					Source:          "/tmpl/t.tmpl",
 					Destination:     "/tmpl/dest",
 				},
@@ -145,7 +141,7 @@ func Test_readConfig(t *testing.T) {
       "after_render_cmd": "echo \"rendererd\"",
       "source": "/etc/tmpl/test.tmpl",
       "destination": "/etc/config/test.cfg",
-      "providers": [
+      "actions": [
         {
           "name": "test_provider",
           "config": {
@@ -162,9 +158,9 @@ func Test_readConfig(t *testing.T) {
 		if err != nil {
 			t.Errorf("error reading config:%v\n", err)
 		}
-		templConf := conf.Templates["test-config"]
-		prov := templConf.Providers[0]
-		sp := sampleProvider{}
+		templConf := conf.TemplateSpecs["test-config"]
+		prov := templConf.Actions[0]
+		sp := sampleActions{}
 		if err := sp.SetConfig(prov.Config); err != nil {
 			t.Errorf("error reading config for sample provider:%v\n", err)
 			return

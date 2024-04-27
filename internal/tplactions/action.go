@@ -1,4 +1,4 @@
-package providers
+package tplactions
 
 import "text/template"
 

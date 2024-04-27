@@ -1,17 +1,17 @@
-package providers
+package tplactions
 
 import (
 	"testing"
 	"text/template"
 )
 
-type noopProvider struct{}
+type noopActions struct{}
 
-func (n noopProvider) FuncMap() template.FuncMap {
+func (n noopActions) FuncMap() template.FuncMap {
 	return map[string]any{}
 }
 
-func (n noopProvider) SetConfig(bytes []byte) error {
+func (n noopActions) SetConfig(bytes []byte) error {
 	return nil
 }
 
@@ -23,10 +23,9 @@ func TestRegister(t *testing.T) {
 	}()
 
 	Register("noop", func() Interface {
-		return &noopProvider{}
+		return &noopActions{}
 	})
-
 	Register("noop", func() Interface {
-		return &noopProvider{}
+		return &noopActions{}
 	})
 }

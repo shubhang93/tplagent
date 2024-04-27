@@ -3,7 +3,7 @@ package sample
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/shubhang93/tplagent/internal/providers"
+	"github.com/shubhang93/tplagent/internal/tplactions"
 	"text/template"
 )
 
@@ -33,7 +33,7 @@ func (p *Provider) SetConfig(bs []byte) error {
 }
 
 func init() {
-	providers.Register("sample", func() providers.Interface {
+	tplactions.Register("sample", func() tplactions.Interface {
 		return &Provider{}
 	})
 }
