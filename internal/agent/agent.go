@@ -27,6 +27,7 @@ type sinkExecConfig struct {
 	name            string
 	cmd             string
 	cmdTimeout      time.Duration
+	renderOnce      bool
 }
 
 func Run(ctx context.Context, config Config) error {
@@ -68,6 +69,7 @@ func initTemplates(templConfig map[string]*TemplateConfig) ([]sinkExecConfig, er
 			staticData:      spec.StaticData,
 			name:            name,
 			cmd:             spec.ExecCMD,
+			renderOnce:      spec.RenderOnce,
 			cmdTimeout:      cmp.Or(time.Duration(spec.ExecTimeout), defaultExecTimeout),
 		}
 		i++
@@ -83,13 +85,13 @@ func renderAndRefresh(ctx context.Context, scs []sinkExecConfig, l *slog.Logger)
 		go func(idx int) {
 			defer wg.Done()
 			sc := scs[idx]
-			startRenderLoop(ctx, sc, l)
+			startRenderLoop(ctx, sc, renderAndExec, l)
 		}(i)
 	}
 	wg.Wait()
 }
 
-func startRenderLoop(ctx context.Context, cfg sinkExecConfig, logger *slog.Logger) {
+func startRenderLoop(ctx context.Context, cfg sinkExecConfig, onTick func(context.Context, sinkExecConfig, render.Sink) error, logger *slog.Logger) {
 	ticker := time.NewTicker(cfg.refreshInterval)
 	tick := ticker.C
 
@@ -100,32 +102,45 @@ func startRenderLoop(ctx context.Context, cfg sinkExecConfig, logger *slog.Logge
 		WriteTo: os.ExpandEnv(cfg.dest),
 	}
 
+	if cfg.renderOnce {
+		if err := onTick(ctx, cfg, sink); err != nil {
+			logger.Error("renderAndExec error", slog.String("error", err.Error()), slog.String("loop", cfg.name), slog.Bool("once", true))
+		}
+		return
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
 			logger.Info("stopping render sink", slog.String("sink", cfg.name), slog.String("cause", ctx.Err().Error()))
 			return
 		case <-tick:
-			err := sink.Render(cfg.staticData)
+			err := onTick(ctx, cfg, sink)
 			if err != nil {
-				logger.Error("render error", slog.String("sink", cfg.name), slog.String("cause", err.Error()))
-				logger.Info("skipping command execution", slog.String("sink", cfg.name))
-				continue
+				logger.Error("renderAndExec error", slog.String("error", err.Error()), slog.String("loop", cfg.name))
 			}
-
-			if cfg.cmd == "" {
-				continue
-			}
-
-			func() {
-				cmdCtx, cancel := context.WithTimeout(ctx, cfg.cmdTimeout)
-				defer cancel()
-				if err := cmdexec.Do(cmdCtx, cfg.cmd); err != nil {
-					logger.Error("error execing command", slog.String("sink", cfg.name), slog.String("cause", err.Error()))
-				}
-			}()
 		}
 	}
+}
+
+func renderAndExec(ctx context.Context, cfg sinkExecConfig, sink render.Sink) error {
+	err := sink.Render(cfg.staticData)
+	if err != nil {
+		return err
+	}
+
+	if cfg.cmd == "" {
+		return nil
+	}
+
+	cmdCtx, cancel := context.WithTimeout(ctx, cfg.cmdTimeout)
+	defer cancel()
+	if err := cmdexec.Do(cmdCtx, cfg.cmd); err != nil {
+		return err
+	}
+
+	return nil
+
 }
 
 func createLogger(fmt string, level slog.Level) *slog.Logger {
@@ -169,7 +184,10 @@ func templateText(raw string, path string, readBuff []byte) (string, error) {
 func attachActions(t *template.Template, templActions []ActionConfig) error {
 	namesSpacedFuncMap := make(template.FuncMap)
 	for _, ta := range templActions {
-		actionMaker := tplactions.Registry[ta.Name]
+		actionMaker, ok := tplactions.Registry[ta.Name]
+		if !ok {
+			return fmt.Errorf("invalid action name:%s", ta.Name)
+		}
 		action := actionMaker()
 		if err := action.SetConfig(ta.Config); err != nil {
 			return fmt.Errorf("error setting config for %s", ta.Name)
@@ -195,6 +213,9 @@ func attachActions(t *template.Template, templActions []ActionConfig) error {
 }
 
 func setTemplateDelims(t *template.Template, delims []string) {
+	if len(delims) < 2 {
+		return
+	}
 	left, right := delims[0], delims[1]
 	t.Delims(left, right)
 }

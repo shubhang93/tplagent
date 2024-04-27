@@ -51,6 +51,7 @@ type TemplateConfig struct {
 
 	StaticData      any      `json:"static_data"`
 	RefreshInterval Duration `json:"refresh_interval"`
+	RenderOnce      bool     `json:"render_once"`
 
 	// command exec config
 	ExecCMD     string   `json:"exec_cmd"`

@@ -17,8 +17,6 @@ type Sink struct {
 	scratch    *bytes.Buffer
 }
 
-const defaultPerms = os.FileMode(0644)
-
 func (s *Sink) Render(staticData any) error {
 	s.init()
 	return backupAndRender(s.Templ, s.WriteTo, s.buffWriter, staticData)
@@ -57,14 +55,13 @@ func backupOldFileIfExists(filename string) error {
 		if err != nil {
 			return err
 		}
-		_ = os.Chmod(bakFilename, defaultPerms)
+		_ = os.Chmod(bakFilename, 0644)
 	}
 	return nil
 }
 
 func createDest(filename string) (*os.File, error) {
 	dirPath := filepath.Dir(filename)
-
 	err := os.MkdirAll(dirPath, 0755)
 
 	if err != nil {
