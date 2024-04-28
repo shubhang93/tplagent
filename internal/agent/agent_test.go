@@ -44,7 +44,7 @@ func Test_initTemplates(t *testing.T) {
 			},
 		}
 
-		_, err := initTemplates(config)
+		_, err := makeSinkExecConfigs(config)
 		if err == nil {
 			t.Errorf("expected error got nil")
 			return
@@ -57,7 +57,7 @@ func Test_initTemplates(t *testing.T) {
 				Raw: "Name: {{}",
 			},
 		}
-		_, err := initTemplates(config)
+		_, err := makeSinkExecConfigs(config)
 		if err == nil {
 			t.Errorf("expected error got nil")
 			return
@@ -84,7 +84,7 @@ func Test_initTemplates(t *testing.T) {
 				StaticData: nil,
 			},
 		}
-		_, err := initTemplates(config)
+		_, err := makeSinkExecConfigs(config)
 		if err == nil {
 			t.Errorf("expected error got nil")
 			return
@@ -116,7 +116,7 @@ func Test_initTemplates(t *testing.T) {
 				StaticData: nil,
 			},
 		}
-		sinkExecCfgs, err := initTemplates(config)
+		sinkExecCfgs, err := makeSinkExecConfigs(config)
 		if err != nil {
 			t.Errorf("init failed with:%v", err)
 			return

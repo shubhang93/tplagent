@@ -3,6 +3,7 @@ package agent
 import (
 	"fmt"
 	"github.com/shubhang93/tplagent/internal/tplactions"
+	"os"
 	"text/template"
 )
 
@@ -51,4 +52,22 @@ func setTemplateDelims(t delimitableTemplate, delims []string) {
 	}
 	left, right := delims[0], delims[1]
 	t.Delims(left, right)
+}
+
+type parseableTemplate interface {
+	Parse(text string) error
+}
+
+func parseTemplate(raw string, readFrom string, pt parseableTemplate) error {
+	if raw != "" {
+		return pt.Parse(raw)
+	}
+	expandedPath := readFrom
+	bs, err := os.ReadFile(expandedPath)
+	if err != nil {
+		return err
+	}
+
+	return pt.Parse(string(bs))
+
 }

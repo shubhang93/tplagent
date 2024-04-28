@@ -1,25 +1,25 @@
 package agent
 
 import (
-	"bytes"
+	"cmp"
 	"context"
-	"fmt"
 	"github.com/shubhang93/tplagent/internal/actionable"
 	"github.com/shubhang93/tplagent/internal/cmdexec"
 	"github.com/shubhang93/tplagent/internal/render"
-	"io"
 	"log/slog"
 	"os"
 	"sync"
 	"time"
 )
 
-const stagingBuffSize = 4096
 const defaultExecTimeout = 60 * time.Second
 
 type sinkExecConfig struct {
 	sinkConfig
 	execConfig
+	html               bool
+	TemplateDelimiters []string
+	actions            []ActionConfig
 }
 
 type sinkConfig struct {
@@ -29,6 +29,8 @@ type sinkConfig struct {
 	staticData      any
 	name            string
 	renderOnce      bool
+	raw             string
+	readFrom        string
 }
 
 type execConfig struct {
@@ -36,11 +38,16 @@ type execConfig struct {
 	cmdTimeout time.Duration
 }
 
+type parseResult struct {
+	err  error
+	name string
+}
+
 func Run(ctx context.Context, config Config) error {
 	logger := createLogger(config.Agent.LogFmt, config.Agent.LogLevel)
 	logger.Info("starting agent")
 	templConfig := config.TemplateSpecs
-	scs, err := initTemplates(templConfig)
+	scs, err := makeSinkExecConfigs(templConfig)
 	if err != nil {
 		return err
 	}
@@ -49,43 +56,27 @@ func Run(ctx context.Context, config Config) error {
 	return nil
 }
 
-func initTemplates(templConfig map[string]*TemplateConfig) ([]sinkExecConfig, error) {
+func makeSinkExecConfigs(templConfig map[string]*TemplateConfig) ([]sinkExecConfig, error) {
 	var i int
 	var scs = make([]sinkExecConfig, len(templConfig))
 	for name := range templConfig {
 		spec := templConfig[name]
-		stagingBuff := make([]byte, stagingBuffSize)
-
-		text, err := templateText(spec.Raw, spec.Source, stagingBuff)
-		if err != nil {
-			return nil, fmt.Errorf("error reading template text for %s:%w", name, err)
-		}
-		at := actionable.NewTemplate(name, spec.HTML)
-		err = at.Parse(text)
-		if err != nil {
-			return nil, fmt.Errorf("templ parse error for %s:%w", name, err)
-		}
-
-		setTemplateDelims(at, spec.TemplateDelimiters)
-		if err := attachActions(at, spec.Actions); err != nil {
-			return nil, fmt.Errorf("error attaching actions for %s:%w", name, err)
-		}
 		scs[i] = sinkExecConfig{
 			sinkConfig: sinkConfig{
-				parsed:          at,
 				refreshInterval: time.Duration(spec.RefreshInterval),
-				dest:            spec.Destination,
+				dest:            os.ExpandEnv(spec.Destination),
 				staticData:      spec.StaticData,
 				name:            name,
 				renderOnce:      spec.RenderOnce,
+				raw:             spec.Raw,
+				readFrom:        os.ExpandEnv(spec.Source),
 			},
 			execConfig: execConfig{
 				cmd:        spec.ExecCMD,
-				cmdTimeout: time.Duration(spec.ExecTimeout),
+				cmdTimeout: cmp.Or(time.Duration(spec.ExecTimeout), defaultExecTimeout),
 			},
 		}
 		i++
-		clear(stagingBuff)
 	}
 	return scs, nil
 }
@@ -97,6 +88,16 @@ func renderAndRefresh(ctx context.Context, scs []sinkExecConfig, l *slog.Logger)
 		go func(idx int) {
 			defer wg.Done()
 			sc := scs[idx]
+			at := actionable.NewTemplate(sc.name, sc.html)
+			setTemplateDelims(at, sc.TemplateDelimiters)
+			if err := attachActions(at, sc.actions); err != nil {
+				l.Error("error attaching template actions", slog.String("name", sc.name), slog.String("error", err.Error()))
+			}
+			err := parseTemplate(sc.raw, sc.readFrom, sc.parsed)
+			if err != nil {
+				l.Error("template parse error", slog.String("name", sc.name), slog.String("error", err.Error()))
+				return
+			}
 			startRenderLoop(ctx, sc, renderAndExec, l)
 		}(i)
 	}
@@ -111,7 +112,7 @@ func startRenderLoop(ctx context.Context, cfg sinkExecConfig, onTick func(contex
 
 	sink := render.Sink{
 		Templ:   cfg.parsed,
-		WriteTo: os.ExpandEnv(cfg.dest),
+		WriteTo: cfg.dest,
 	}
 
 	if cfg.renderOnce {
@@ -174,21 +175,4 @@ var replacer = func(groups []string, a slog.Attr) slog.Attr {
 		return slog.String(a.Key, a.Value.Time().Format(time.DateTime))
 	}
 	return a
-}
-
-func templateText(raw string, path string, readBuff []byte) (string, error) {
-	expandedPath := os.ExpandEnv(path)
-	if raw != "" {
-		return raw, nil
-	}
-	file, err := os.Open(expandedPath)
-	if err != nil {
-		return "", err
-	}
-	var buff bytes.Buffer
-	_, err = io.CopyBuffer(&buff, file, readBuff)
-	if err != nil {
-		return "", err
-	}
-	return buff.String(), nil
 }
