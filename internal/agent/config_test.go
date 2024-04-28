@@ -115,7 +115,7 @@ func Test_readConfig(t *testing.T) {
 				},
 				"templ-conf2": {
 					RefreshInterval: Duration(1 * time.Second),
-					Source:          "/tmpl/t.tmpl",
+					Source:          "/tmpl/parsed.tmpl",
 					Destination:     "/tmpl/dest",
 				},
 			},

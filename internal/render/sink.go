@@ -5,13 +5,17 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
-	"text/template"
 )
 
+type executableTemplate interface {
+	Execute(io.Writer, any) error
+}
+
 type Sink struct {
-	Templ      *template.Template
+	Templ      executableTemplate
 	WriteTo    string
 	buffWriter *bufio.Writer
 	scratch    *bytes.Buffer
@@ -31,7 +35,7 @@ func (s *Sink) init() {
 	}
 }
 
-func backupAndRender(t *template.Template, writeTo string, buffWr *bufio.Writer, staticData any) error {
+func backupAndRender(t executableTemplate, writeTo string, buffWr *bufio.Writer, staticData any) error {
 	err := backupOldFileIfExists(writeTo)
 	if err != nil {
 		return fmt.Errorf("could not create backup for %s:%w", writeTo, err)
@@ -71,7 +75,7 @@ func createDest(filename string) (*os.File, error) {
 	return os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 }
 
-func renderTempl(t *template.Template, buffWr *bufio.Writer, staticData any) error {
+func renderTempl(t executableTemplate, buffWr *bufio.Writer, staticData any) error {
 	defer buffWr.Flush()
 	if err := t.Execute(buffWr, staticData); err != nil {
 		return fmt.Errorf("error writing dest file:%w", err)

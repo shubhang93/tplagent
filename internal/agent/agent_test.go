@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"github.com/shubhang93/tplagent/internal/actionable"
 	"github.com/shubhang93/tplagent/internal/render"
 	"github.com/shubhang93/tplagent/internal/tplactions"
 	"log/slog"
@@ -11,6 +12,12 @@ import (
 	"text/template"
 	"time"
 )
+
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
 
 type mockAction struct{}
 
@@ -124,7 +131,8 @@ func Test_renderLoop(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	renderPath := fmt.Sprintf("%s/%s", tmpDir, "test.render")
-	tpl := template.Must(template.New("test").Parse("Name: {{.name}}"))
+	tpl := actionable.NewTemplate("test", false)
+	must(tpl.Parse("Name {{.name}}"))
 
 	type loopTest struct {
 		name      string
@@ -136,26 +144,34 @@ func Test_renderLoop(t *testing.T) {
 		name:      "render once is false",
 		wantCount: 10,
 		cfg: sinkExecConfig{
-			t:               tpl,
-			refreshInterval: 500 * time.Millisecond,
-			dest:            renderPath,
-			staticData:      map[string]any{"name": "foo"},
-			name:            "test-tmpl",
-			cmd:             `echo "rendered"`,
-			cmdTimeout:      30 * time.Second,
+			sinkConfig: sinkConfig{
+				parsed:          tpl,
+				refreshInterval: 500 * time.Millisecond,
+				dest:            renderPath,
+				staticData:      map[string]any{"name": "foo"},
+				name:            "test-tmpl",
+			},
+			execConfig: execConfig{
+				cmd:        `echo "rendered"`,
+				cmdTimeout: 30 * time.Second,
+			},
 		},
 	}, {
 		name:      "render once is true",
 		wantCount: 1,
 		cfg: sinkExecConfig{
-			renderOnce:      true,
-			t:               tpl,
-			refreshInterval: 500 * time.Millisecond,
-			dest:            renderPath,
-			staticData:      map[string]any{"name": "foo"},
-			name:            "test-tmpl",
-			cmd:             `echo "rendered"`,
-			cmdTimeout:      30 * time.Second,
+			sinkConfig: sinkConfig{
+				renderOnce:      true,
+				parsed:          tpl,
+				refreshInterval: 500 * time.Millisecond,
+				dest:            renderPath,
+				staticData:      map[string]any{"name": "foo"},
+				name:            "test-tmpl",
+			},
+			execConfig: execConfig{
+				cmd:        `echo "rendered"`,
+				cmdTimeout: 30 * time.Second,
+			},
 		},
 	}}
 

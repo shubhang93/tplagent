@@ -48,6 +48,7 @@ type TemplateConfig struct {
 	Source             string         `json:"source"`
 	Raw                string         `json:"raw"`
 	Destination        string         `json:"destination"`
+	HTML               bool           `json:"html"`
 
 	StaticData      any      `json:"static_data"`
 	RefreshInterval Duration `json:"refresh_interval"`
