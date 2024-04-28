@@ -90,6 +90,11 @@ func validateConfig(c *Config) error {
 	}
 
 	for tmplName, tmplConfig := range c.TemplateSpecs {
+
+		if tmplName == "" {
+			return errors.New(`found "" as the template key`)
+		}
+
 		if tmplConfig.RefreshInterval < Duration(1*time.Second) {
 			refrIntErr := fmt.Errorf("refresh interval should be >= 1s tmpl name:%s", tmplName)
 			valErrs = append(valErrs, refrIntErr)

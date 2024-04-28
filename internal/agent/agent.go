@@ -3,6 +3,8 @@ package agent
 import (
 	"cmp"
 	"context"
+	"errors"
+	"fmt"
 	"github.com/shubhang93/tplagent/internal/actionable"
 	"github.com/shubhang93/tplagent/internal/cmdexec"
 	"github.com/shubhang93/tplagent/internal/render"
@@ -17,14 +19,16 @@ const defaultExecTimeout = 60 * time.Second
 type sinkExecConfig struct {
 	sinkConfig
 	execConfig
-	html               bool
-	TemplateDelimiters []string
-	actions            []ActionConfig
 }
+
+type tickFunc func(ctx context.Context, config sinkExecConfig, sink render.Sink) error
 
 type sinkConfig struct {
 	parsed          *actionable.Template
 	refreshInterval time.Duration
+	html            bool
+	templateDelims  []string
+	actions         []ActionConfig
 	dest            string
 	staticData      any
 	name            string
@@ -38,25 +42,15 @@ type execConfig struct {
 	cmdTimeout time.Duration
 }
 
-type parseResult struct {
-	err  error
-	name string
-}
-
 func Run(ctx context.Context, config Config) error {
 	logger := createLogger(config.Agent.LogFmt, config.Agent.LogLevel)
 	logger.Info("starting agent")
 	templConfig := config.TemplateSpecs
-	scs, err := makeSinkExecConfigs(templConfig)
-	if err != nil {
-		return err
-	}
-
-	renderAndRefresh(ctx, scs, logger)
-	return nil
+	scs := makeSinkExecConfigs(templConfig)
+	return renderAndRefresh(ctx, scs, renderAndExec, logger)
 }
 
-func makeSinkExecConfigs(templConfig map[string]*TemplateConfig) ([]sinkExecConfig, error) {
+func makeSinkExecConfigs(templConfig map[string]*TemplateConfig) []sinkExecConfig {
 	var i int
 	var scs = make([]sinkExecConfig, len(templConfig))
 	for name := range templConfig {
@@ -64,12 +58,15 @@ func makeSinkExecConfigs(templConfig map[string]*TemplateConfig) ([]sinkExecConf
 		scs[i] = sinkExecConfig{
 			sinkConfig: sinkConfig{
 				refreshInterval: time.Duration(spec.RefreshInterval),
+				html:            spec.HTML,
+				templateDelims:  spec.TemplateDelimiters,
+				actions:         spec.Actions,
+				readFrom:        os.ExpandEnv(spec.Source),
 				dest:            os.ExpandEnv(spec.Destination),
 				staticData:      spec.StaticData,
 				name:            name,
 				renderOnce:      spec.RenderOnce,
 				raw:             spec.Raw,
-				readFrom:        os.ExpandEnv(spec.Source),
 			},
 			execConfig: execConfig{
 				cmd:        spec.ExecCMD,
@@ -78,30 +75,52 @@ func makeSinkExecConfigs(templConfig map[string]*TemplateConfig) ([]sinkExecConf
 		}
 		i++
 	}
-	return scs, nil
+	return scs
 }
 
-func renderAndRefresh(ctx context.Context, scs []sinkExecConfig, l *slog.Logger) {
+type errMap map[string]error
+
+func (e errMap) Error() string {
+	var errs []error
+	for k, err := range e {
+		errs = append(errs, fmt.Errorf("%s:%w", k, err))
+	}
+	return errors.Join(errs...).Error()
+}
+
+func renderAndRefresh(ctx context.Context, scs []sinkExecConfig, tf tickFunc, l *slog.Logger) error {
 	var wg sync.WaitGroup
 
+	initErrors := errMap{}
 	for i := range scs {
+		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
 			sc := scs[idx]
-			at := actionable.NewTemplate(sc.name, sc.html)
-			setTemplateDelims(at, sc.TemplateDelimiters)
-			if err := attachActions(at, sc.actions); err != nil {
-				l.Error("error attaching template actions", slog.String("name", sc.name), slog.String("error", err.Error()))
-			}
-			err := parseTemplate(sc.raw, sc.readFrom, sc.parsed)
-			if err != nil {
-				l.Error("template parse error", slog.String("name", sc.name), slog.String("error", err.Error()))
+			if err := initTemplate(&sc); err != nil {
+				initErrors[sc.name] = fmt.Errorf("init template error for %s:%w", sc.name, err)
+				l.Error("init template error", slog.String("error", err.Error()), slog.String("name", sc.name))
 				return
 			}
-			startRenderLoop(ctx, sc, renderAndExec, l)
+			startRenderLoop(ctx, sc, tf, l)
 		}(i)
 	}
+
 	wg.Wait()
+	if len(initErrors) < 1 {
+		return nil
+	}
+	return initErrors
+}
+
+func initTemplate(sc *sinkExecConfig) error {
+	at := actionable.NewTemplate(sc.name, sc.html)
+	setTemplateDelims(at, sc.templateDelims)
+	if err := attachActions(at, sc.actions); err != nil {
+		return err
+	}
+	sc.parsed = at
+	return parseTemplate(sc.raw, sc.readFrom, sc.parsed)
 }
 
 func startRenderLoop(ctx context.Context, cfg sinkExecConfig, onTick func(context.Context, sinkExecConfig, render.Sink) error, logger *slog.Logger) {
@@ -122,6 +141,7 @@ func startRenderLoop(ctx context.Context, cfg sinkExecConfig, onTick func(contex
 		return
 	}
 
+	failureCount := 0
 	for {
 		select {
 		case <-ctx.Done():
@@ -130,10 +150,20 @@ func startRenderLoop(ctx context.Context, cfg sinkExecConfig, onTick func(contex
 		case <-tick:
 			err := onTick(ctx, cfg, sink)
 			if err != nil {
-				logger.Error("renderAndExec error", slog.String("error", err.Error()), slog.String("loop", cfg.name))
+				failureCount++
+				logger.Error(
+					"renderAndExec error",
+					slog.String("error", err.Error()),
+					slog.String("loop", cfg.name),
+					slog.Int("consecutive-fail-count", failureCount),
+				)
+				continue
 			}
+			// reset failure count
+			failureCount = 0
 		}
 	}
+
 }
 
 func renderAndExec(ctx context.Context, cfg sinkExecConfig, sink render.Sink) error {

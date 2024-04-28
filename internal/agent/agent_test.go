@@ -1,13 +1,15 @@
 package agent
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/shubhang93/tplagent/internal/actionable"
 	"github.com/shubhang93/tplagent/internal/render"
-	"github.com/shubhang93/tplagent/internal/tplactions"
 	"log/slog"
 	"os"
+	"slices"
 	"testing"
 	"text/template"
 	"time"
@@ -29,102 +31,80 @@ func (m mockAction) SetConfig(bytes []byte) error {
 	return nil
 }
 
-func Test_initTemplates(t *testing.T) {
-	t.Run("invalid template file name", func(t *testing.T) {
+func Test_makeSinkExecConfigs(t *testing.T) {
+	t.Run("paths containing env vars should get expanded", func(t *testing.T) {
 		config := map[string]*TemplateConfig{
 			"testconfig": {
-				Actions: []ActionConfig{{
-					Name:   "foo",
-					Config: []byte{},
-				}},
-				Source: "/tmp/foo",
-			},
-			"testconfig2": {
-				Source: "/tmp/bar",
-			},
-		}
-
-		_, err := makeSinkExecConfigs(config)
-		if err == nil {
-			t.Errorf("expected error got nil")
-			return
-		}
-		t.Log(err)
-	})
-	t.Run("invalid template from Raw", func(t *testing.T) {
-		config := map[string]*TemplateConfig{
-			"testconfig": {
-				Raw: "Name: {{}",
-			},
-		}
-		_, err := makeSinkExecConfigs(config)
-		if err == nil {
-			t.Errorf("expected error got nil")
-			return
-		}
-		t.Log(err)
-	})
-
-	t.Run("invalid action name", func(t *testing.T) {
-		config := map[string]*TemplateConfig{
-			"testconfig": {
-				Actions: []ActionConfig{{
-					Name:   "unknownAction",
-					Config: []byte{},
-				}},
-				Raw:        "Name: {{.Name}}",
-				StaticData: nil,
+				Source:          "$HOME/testdir",
+				Destination:     "${HOME}/testdir2",
+				HTML:            false,
+				StaticData:      map[string]any{},
+				RefreshInterval: Duration(1 * time.Second),
+				RenderOnce:      true,
+				ExecCMD:         "echo hello",
+				ExecTimeout:     Duration(5 * time.Second),
 			},
 			"testconfig2": {
 				Actions: []ActionConfig{{
-					Name:   "unknownAction",
-					Config: []byte{},
+					Name:   "httpJson",
+					Config: []byte(`{"key":"value"}`),
 				}},
-				Raw:        "Name: {{.Name}}",
-				StaticData: nil,
+				TemplateDelimiters: []string{"<<", ">>"},
+				HTML:               true,
+				StaticData:         map[string]any{},
+				RenderOnce:         true,
+				ExecCMD:            "echo hello",
 			},
 		}
-		_, err := makeSinkExecConfigs(config)
-		if err == nil {
-			t.Errorf("expected error got nil")
-			return
-		}
-		t.Log(err)
-	})
 
-	t.Run("valid config", func(t *testing.T) {
+		homeDir := os.Getenv("HOME")
+		expectedConfigs := []sinkExecConfig{
+			{
+				sinkConfig: sinkConfig{
+					refreshInterval: 1 * time.Second,
+					dest:            homeDir + "/testdir2",
+					staticData:      map[string]any{},
+					name:            "testconfig",
+					renderOnce:      true,
+					readFrom:        homeDir + "/testdir",
+				},
+				execConfig: execConfig{
+					cmd:        "echo hello",
+					cmdTimeout: 5 * time.Second,
+				},
+			},
+			{
+				sinkConfig: sinkConfig{
+					html:           true,
+					templateDelims: []string{"<<", ">>"},
+					actions: []ActionConfig{{
+						Name:   "httpJson",
+						Config: []byte(`{"key":"value"}`),
+					}},
+					staticData: map[string]any{},
+					name:       "testconfig2",
+					renderOnce: true,
+				},
+				execConfig: execConfig{
+					cmd:        "echo hello",
+					cmdTimeout: 60 * time.Second,
+				},
+			}}
 
-		tplactions.Register("fooAction", func() tplactions.Interface {
-			return mockAction{}
+		seConfigs := makeSinkExecConfigs(config)
+		slices.SortFunc(seConfigs, func(a, b sinkExecConfig) int {
+			return cmp.Compare(a.name, b.name)
 		})
 
-		config := map[string]*TemplateConfig{
-			"testconfig": {
-				Actions: []ActionConfig{{
-					Name:   "fooAction",
-					Config: []byte{},
-				}},
-				Raw:        "Name: {{.Name}}",
-				StaticData: nil,
-			},
-			"testconfig2": {
-				Actions: []ActionConfig{{
-					Name:   "fooAction",
-					Config: []byte{},
-				}},
-				Raw:        "Name: {{.Name}}",
-				StaticData: nil,
-			},
-		}
-		sinkExecCfgs, err := makeSinkExecConfigs(config)
-		if err != nil {
-			t.Errorf("init failed with:%v", err)
-			return
-		}
-		if len(sinkExecCfgs) != len(config) {
-			t.Errorf("expected len %d got %d", len(config), len(sinkExecCfgs))
+		if diff := gocmp.Diff(
+			expectedConfigs,
+			seConfigs,
+			gocmp.AllowUnexported(sinkExecConfig{}, execConfig{}, sinkConfig{}),
+		); diff != "" {
+			t.Errorf("(--Want ++Got)%s\n", diff)
 		}
 	})
+
 }
 
 func Test_renderLoop(t *testing.T) {
@@ -180,7 +160,7 @@ func Test_renderLoop(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5000*time.Millisecond)
 			defer cancel()
 
-			logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+			logger := newLogger()
 
 			execCount := 0
 			onTick := func(ctx context.Context, config sinkExecConfig, sink render.Sink) error {
@@ -195,4 +175,57 @@ func Test_renderLoop(t *testing.T) {
 		})
 	}
 
+	t.Run("init template", func(t *testing.T) {
+		err := initTemplate(&sinkExecConfig{
+			sinkConfig: sinkConfig{
+				readFrom: "/some-non-existent/path.tmpl",
+			},
+		})
+		if err == nil {
+			t.Errorf("expected error to be not nil")
+			return
+		}
+		t.Log(err)
+	})
+
+	t.Run("all templates in renderAndRefresh fail to initialize", func(t *testing.T) {
+		scs := []sinkExecConfig{
+			{
+				sinkConfig: sinkConfig{
+					name: "malofmedTmpl",
+					raw:  "{{.",
+				},
+			}, {
+				sinkConfig: sinkConfig{
+					name:     "nonExistentPath",
+					readFrom: "/some/nonexistent-path/path.tpl",
+				},
+			}, {
+				sinkConfig: sinkConfig{
+					name: "nonExistentAction",
+					actions: []ActionConfig{{
+						Name:   "fooaction",
+						Config: nil,
+					}},
+				},
+			}}
+
+		tf := tickFunc(func(ctx context.Context, config sinkExecConfig, sink render.Sink) error {
+			return nil
+		})
+		err := renderAndRefresh(context.Background(), scs, tf, newLogger())
+		if err == nil {
+			t.Error("expected error but got nil")
+			return
+		}
+		t.Log(err)
+	})
+
+	t.Run("test render and refresh for a valid config", func(t *testing.T) {
+
+	})
+}
+
+func newLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(os.Stdout, nil))
 }
