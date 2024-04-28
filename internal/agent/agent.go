@@ -23,7 +23,7 @@ type sinkExecConfig struct {
 }
 
 type sinkConfig struct {
-	parsed          actionedExecutableTemplate
+	parsed          *actionable.Template
 	refreshInterval time.Duration
 	dest            string
 	staticData      any
@@ -34,12 +34,6 @@ type sinkConfig struct {
 type execConfig struct {
 	cmd        string
 	cmdTimeout time.Duration
-}
-
-type actionedExecutableTemplate interface {
-	actionableTemplate
-	delimitableTemplate
-	Execute(writer io.Writer, data any) error
 }
 
 func Run(ctx context.Context, config Config) error {
