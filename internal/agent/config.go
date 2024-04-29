@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/shubhang93/tplagent/internal/fatal"
 	"io"
 	"log/slog"
 	"os"
@@ -66,7 +67,7 @@ type Config struct {
 func ReadConfigFromFile(path string) (Config, error) {
 	confFile, err := os.Open(os.ExpandEnv(path))
 	if err != nil {
-		return Config{}, fmt.Errorf("config file read error:%w", err)
+		return Config{}, fatal.NewError(fmt.Errorf("read config:%w", err))
 	}
 	return readConfig(confFile)
 }
@@ -74,10 +75,10 @@ func ReadConfigFromFile(path string) (Config, error) {
 func readConfig(rr io.Reader) (Config, error) {
 	var c Config
 	if err := json.NewDecoder(rr).Decode(&c); err != nil {
-		return Config{}, fmt.Errorf("config decode error:%w", err)
+		return Config{}, fatal.NewError(fmt.Errorf("config decode error:%w", err))
 	}
 	if err := validateConfig(&c); err != nil {
-		return Config{}, err
+		return Config{}, fatal.NewError(err)
 	}
 	return c, nil
 }
@@ -85,22 +86,23 @@ func readConfig(rr io.Reader) (Config, error) {
 func validateConfig(c *Config) error {
 	var valErrs []error
 	if _, ok := allowedLogFmts[c.Agent.LogFmt]; !ok {
-		valErrs = append(valErrs, fmt.Errorf("agent config invalid invalid log level:%s", c.Agent.LogFmt))
+		valErrs = append(valErrs, fmt.Errorf("validate:invalid log level"))
 	}
 
 	for tmplName, tmplConfig := range c.TemplateSpecs {
 
 		if tmplName == "" {
-			return errors.New(`found "" as the template key`)
+			return errors.New(`validate:found "" as the template key`)
 		}
 
-		if tmplConfig.RefreshInterval < Duration(1*time.Second) {
-			refrIntErr := fmt.Errorf("refresh interval should be >= 1s tmpl name:%s", tmplName)
+		refrInterval := tmplConfig.RefreshInterval
+		if refrInterval > 0 && refrInterval < Duration(1*time.Second) {
+			refrIntErr := fmt.Errorf("validate:refresh interval should be >= 1s tmpl name:%s", tmplName)
 			valErrs = append(valErrs, refrIntErr)
 		}
 
 		if tmplConfig.Source == "" && tmplConfig.Raw == "" {
-			srcEmptyErr := fmt.Errorf("expected one of Source OR Raw to be provided tmpl name:%s", tmplName)
+			srcEmptyErr := fmt.Errorf("validate:expected one of Source OR Raw to be provided tmpl %s", tmplName)
 			valErrs = append(valErrs, srcEmptyErr)
 		}
 
@@ -109,13 +111,13 @@ func validateConfig(c *Config) error {
 		}
 		actionValErrs := validateActionConfigs(tmplConfig.Actions)
 		if actionValErrs != nil {
-			actionValErrs = fmt.Errorf("action validation error for %s:%w", tmplName, actionValErrs)
+			actionValErrs = fmt.Errorf("validate:action invalid for %s:%w", tmplName, actionValErrs)
 			valErrs = append(valErrs, actionValErrs)
 		}
 
 		delimLen := len(tmplConfig.TemplateDelimiters)
 		if delimLen > 0 && delimLen != 2 {
-			valErrs = append(valErrs, fmt.Errorf("ivalid tplactions delimiters for %s", tmplName))
+			valErrs = append(valErrs, fmt.Errorf("validate: invalid tplactions delimiters for %s", tmplName))
 		}
 	}
 
@@ -127,7 +129,7 @@ func validateActionConfigs(actions []ActionConfig) error {
 	var provValErrs []error
 	for i := range actions {
 		if actions[i].Name == "" {
-			provValErrs = append(provValErrs, fmt.Errorf("action name cannot be empty for actions[%d]", i))
+			provValErrs = append(provValErrs, fmt.Errorf("validate: action name cannot be empty for actions[%d]", i))
 		}
 	}
 	return errors.Join(provValErrs...)

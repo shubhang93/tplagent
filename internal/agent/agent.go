@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/shubhang93/tplagent/internal/actionable"
 	"github.com/shubhang93/tplagent/internal/cmdexec"
+	"github.com/shubhang93/tplagent/internal/fatal"
 	"github.com/shubhang93/tplagent/internal/render"
 	"log/slog"
 	"os"
@@ -44,12 +45,16 @@ type execConfig struct {
 	cmdTimeout time.Duration
 }
 
-func Run(ctx context.Context, config Config) error {
-	logger := createLogger(config.Agent.LogFmt, config.Agent.LogLevel)
-	logger.Info("starting agent")
+type Process struct {
+	Logger  *slog.Logger
+	configs []sinkExecConfig
+}
+
+func (p *Process) Start(ctx context.Context, config Config) error {
 	templConfig := config.TemplateSpecs
 	scs := makeSinkExecConfigs(templConfig)
-	return startTickLoops(ctx, scs, renderAndExec, logger)
+	p.configs = scs
+	return p.startTickLoops(ctx, renderAndExec)
 }
 
 func makeSinkExecConfigs(templConfig map[string]*TemplateConfig) []sinkExecConfig {
@@ -67,9 +72,9 @@ func makeSinkExecConfigs(templConfig map[string]*TemplateConfig) []sinkExecConfi
 				dest:            os.ExpandEnv(spec.Destination),
 				staticData:      spec.StaticData,
 				name:            name,
-				renderOnce:      spec.RenderOnce,
+				renderOnce:      cmp.Or(spec.RenderOnce || spec.RefreshInterval == 0),
 				raw:             spec.Raw,
-				missingKey:      spec.MissingKey,
+				missingKey:      strings.TrimSpace(spec.MissingKey),
 			},
 			execConfig: execConfig{
 				cmd:        strings.TrimSpace(spec.ExecCMD),
@@ -90,26 +95,27 @@ func (t templInitErr) Error() string {
 	return fmt.Sprintf("template init error for %s:%s", t.name, t.err.Error())
 }
 
-func startTickLoops(ctx context.Context, scs []sinkExecConfig, tf tickFunc, l *slog.Logger) error {
+func (p *Process) startTickLoops(ctx context.Context, tf tickFunc) error {
 	var wg sync.WaitGroup
 
 	errsChan := make(chan error)
 
-	for i := range scs {
+	for i := range p.configs {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			sc := scs[idx]
+			sc := p.configs[idx]
 			if err := initTemplate(&sc); err != nil {
-				initErr := templInitErr{
-					name: sc.name,
-					err:  err,
-				}
+				initErr := fatal.NewError(
+					templInitErr{
+						name: sc.name,
+						err:  err,
+					})
 				errsChan <- initErr
-				l.Error("init template error", slog.String("error", err.Error()), slog.String("name", sc.name))
+				p.Logger.Error("init template error", slog.String("error", err.Error()), slog.String("name", sc.name))
 				return
 			}
-			startRenderLoop(ctx, sc, tf, l)
+			startRenderLoop(ctx, sc, tf, p.Logger)
 		}(i)
 	}
 
@@ -203,30 +209,5 @@ func renderAndExec(ctx context.Context, cfg sinkExecConfig, sink render.Sink) er
 	}
 
 	return nil
-
-}
-
-func createLogger(fmt string, level slog.Level) *slog.Logger {
-	if fmt == "json" {
-		return slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-			Level:       level,
-			ReplaceAttr: replacer,
-		}))
-	}
-
-	return slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level:       level,
-		ReplaceAttr: replacer,
-	}))
-}
-
-var replacer = func(groups []string, a slog.Attr) slog.Attr {
-	if a.Key == "time" {
-		return slog.String(a.Key, a.Value.Time().Format(time.DateTime))
-	}
-	return a
-}
-
-func closeActions() {
 
 }

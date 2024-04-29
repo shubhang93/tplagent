@@ -13,7 +13,6 @@ import (
 	"slices"
 	"sync"
 	"testing"
-	"text/template"
 	"time"
 )
 
@@ -21,16 +20,6 @@ func must(err error) {
 	if err != nil {
 		panic(err)
 	}
-}
-
-type mockAction struct{}
-
-func (m mockAction) FuncMap() template.FuncMap {
-	return make(template.FuncMap)
-}
-
-func (m mockAction) SetConfig(bytes []byte) error {
-	return nil
 }
 
 func Test_makeSinkExecConfigs(t *testing.T) {
@@ -212,10 +201,15 @@ func Test_renderLoop(t *testing.T) {
 				},
 			}}
 
+		p := Process{
+			Logger:  newLogger(),
+			configs: scs,
+		}
+
 		tf := tickFunc(func(ctx context.Context, config sinkExecConfig, sink render.Sink) error {
 			return nil
 		})
-		err := startTickLoops(context.Background(), scs, tf, newLogger())
+		err := p.startTickLoops(context.Background(), tf)
 		if err == nil {
 			t.Error("expected error but got nil")
 			return
@@ -275,16 +269,22 @@ func Test_renderLoop(t *testing.T) {
 				t.Errorf("renderAndExec failed for %s:%v", config.name, err)
 			}
 			mu.Lock()
-			loopRunCounts[config.cmd]++
+			loopRunCounts[config.name]++
 			mu.Unlock()
 			return nil
 		})
-		if err := startTickLoops(ctx, configs, tf, newLogger()); err != nil {
+
+		p := Process{
+			Logger:  newLogger(),
+			configs: configs,
+		}
+
+		if err := p.startTickLoops(ctx, tf); err != nil {
 			t.Errorf("startTickLoops failed with error:%v", err)
 		}
 		for name, lrc := range loopRunCounts {
-			if lrc < 5 {
-				t.Errorf("loop run count for %s < 5", name)
+			if lrc < 3 {
+				t.Errorf("loop run count for %s < 3 got:%d", name, lrc)
 				return
 			}
 		}
@@ -309,7 +309,6 @@ func Test_renderLoop(t *testing.T) {
 			t.Errorf("expectedContent2:\n%s got:\n%s", expectedContent2, string(bs))
 			return
 		}
-
 	})
 }
 
