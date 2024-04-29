@@ -69,9 +69,9 @@ func spawnAndReload(rootCtx context.Context, processMaker func(logger *slog.Logg
 		select {
 		case <-sighup:
 			cancel(sighupReceived)
-			ctx, cancel = context.WithCancelCause(rootCtx)
 			// spawn a new agent to reload config
 			acquireSem(sem)
+			ctx, cancel = context.WithCancelCause(rootCtx)
 			go func() {
 				err := spawn(ctx, processMaker, configPath, true)
 				spawnErrChan <- err

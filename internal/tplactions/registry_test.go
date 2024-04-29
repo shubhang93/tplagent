@@ -15,6 +15,8 @@ func (n noopActions) SetConfig(bytes []byte) error {
 	return nil
 }
 
+func (n noopActions) Close() {}
+
 func TestRegister(t *testing.T) {
 	defer func() {
 		if r := recover(); r == nil {
