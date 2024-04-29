@@ -8,6 +8,7 @@ import (
 	"github.com/shubhang93/tplagent/internal/agent"
 	"log/slog"
 	"os"
+	"os/signal"
 	"syscall"
 	"testing"
 	"time"
@@ -20,112 +21,157 @@ func (m mockAgent) Start(ctx context.Context, config agent.Config) error {
 }
 
 func Test_spawnAndReload(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2000*time.Millisecond)
-	defer cancel()
 
 	tmpDir := t.TempDir()
 
-	makeConfig := func(suffix string) agent.Config {
-		return agent.Config{
-			Agent: agent.AgentConfig{
-				LogLevel: slog.LevelInfo,
-				LogFmt:   "json",
-				PIDFile:  tmpDir + "/agent.pid",
-			},
-			TemplateSpecs: map[string]*agent.TemplateConfig{
-				"templ1": {
-					Raw:         fmt.Sprintf("{{.Name_%s}}", suffix),
-					Destination: tmpDir + "/dest.render" + suffix,
-				},
-				"templ2": {
-					Raw:         "{{.ID}}",
-					Destination: tmpDir + "/dest2.render" + suffix,
-				},
-			},
+	t.Run("SIGHUP", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 2000*time.Millisecond)
+		defer cancel()
+
+		oldConfig := makeConfig("old", tmpDir)
+
+		cfgFileLocation := tmpDir + "/agent-config.json"
+		f, err := os.OpenFile(cfgFileLocation, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0755)
+		if err != nil {
+			t.Errorf("error creating config file:%v", err)
+			return
 		}
-	}
 
-	oldConfig := makeConfig("old")
+		err = json.NewEncoder(f).Encode(&oldConfig)
+		if err != nil {
+			t.Errorf("error writing old config:%v", err)
+			return
+		}
+		_ = f.Close()
 
-	cfgFileLocation := tmpDir + "/agent-config.json"
-	f, err := os.OpenFile(cfgFileLocation, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0755)
-	if err != nil {
-		t.Errorf("error creating config file:%v", err)
-		return
-	}
+		p, err := os.FindProcess(os.Getpid())
+		if err != nil {
+			t.Errorf("failed to get process:%v", err)
+			return
+		}
 
-	err = json.NewEncoder(f).Encode(&oldConfig)
-	if err != nil {
-		t.Errorf("error writing old config:%v", err)
-		return
-	}
-	_ = f.Close()
+		reloadTimes := 5
 
-	p, err := os.FindProcess(os.Getpid())
-	if err != nil {
-		t.Errorf("failed to get process:%v", err)
-		return
-	}
-
-	reloadTimes := 5
-
-	var newConfigs []agent.Config
-	var expectedContextCauses []string
-	for i := range reloadTimes {
-		cfgSuffix := fmt.Sprintf("new%d", i)
-		newConfig := makeConfig(cfgSuffix)
-		newConfigs = append(newConfigs, newConfig)
-		expectedContextCauses = append(expectedContextCauses, sighupReceived.Error())
-	}
-
-	go func() {
-		time.Sleep(100 * time.Millisecond)
+		var newConfigs []agent.Config
+		var expectedContextCauses []string
 		for i := range reloadTimes {
-			cfgFileLocation := tmpDir + "/agent-config.json"
-			f, err := os.OpenFile(cfgFileLocation, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0755)
-			if err != nil {
-				t.Errorf("error creating config file:%v", err)
-				return
-			}
-			newConfig := newConfigs[i]
-			if err := json.NewEncoder(f).Encode(&newConfig); err != nil {
-				t.Errorf("error writing config:%d:%v", i, err)
-				return
-			}
-			_ = f.Close()
-			_ = p.Signal(syscall.SIGHUP)
+			cfgSuffix := fmt.Sprintf("new%d", i)
+			newConfig := makeConfig(cfgSuffix, tmpDir)
+			newConfigs = append(newConfigs, newConfig)
+			expectedContextCauses = append(expectedContextCauses, sighupReceived.Error())
+		}
+
+		go func() {
 			time.Sleep(100 * time.Millisecond)
+			for i := range reloadTimes {
+				cfgFileLocation := tmpDir + "/agent-config.json"
+				f, err := os.OpenFile(cfgFileLocation, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0755)
+				if err != nil {
+					t.Errorf("error creating config file:%v", err)
+					return
+				}
+				newConfig := newConfigs[i]
+				if err := json.NewEncoder(f).Encode(&newConfig); err != nil {
+					t.Errorf("error writing config:%d:%v", i, err)
+					return
+				}
+				_ = f.Close()
+				_ = p.Signal(syscall.SIGHUP)
+				time.Sleep(100 * time.Millisecond)
+			}
+		}()
+
+		var gotConfigs []agent.Config
+		var gotContextCauses []string
+
+		ma := mockAgent(func(ctx context.Context, config agent.Config) error {
+
+			select {
+			case <-ctx.Done():
+				gotConfigs = append(gotConfigs, config)
+				gotContextCauses = append(gotContextCauses, context.Cause(ctx).Error())
+			}
+
+			return nil
+		})
+
+		processMaker := func(l *slog.Logger) agentProcess {
+			return ma
 		}
-	}()
 
-	var gotConfigs []agent.Config
-	var gotContextCauses []string
-	ma := mockAgent(func(ctx context.Context, config agent.Config) error {
+		spawnAndReload(ctx, processMaker, cfgFileLocation)
 
-		select {
-		case <-ctx.Done():
-			gotConfigs = append(gotConfigs, config)
-			gotContextCauses = append(gotContextCauses, context.Cause(ctx).Error())
+		expectedConfigs := append([]agent.Config{oldConfig}, newConfigs...)
+
+		if diff := cmp.Diff(expectedConfigs, gotConfigs); diff != "" {
+			t.Errorf("(--Want ++Got)\n%s", diff)
+			return
 		}
 
-		return nil
+		expectedContextCauses = append(expectedContextCauses, context.DeadlineExceeded.Error())
+		if diff := cmp.Diff(expectedContextCauses, gotContextCauses); diff != "" {
+			t.Errorf("(--Want ++Got)\n%s", diff)
+		}
 	})
 
-	processMaker := func(l *slog.Logger) agentProcess {
-		return ma
-	}
+	t.Run("SIGINT,SIGTERM", func(t *testing.T) {
+		ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+		defer cancel()
 
-	spawnAndReload(ctx, processMaker, cfgFileLocation)
+		cfgFileLocation := tmpDir + "/agent-config.json"
+		f, err := os.OpenFile(cfgFileLocation, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0755)
+		if err != nil {
+			t.Errorf("error creating config file:%v", err)
+			return
+		}
 
-	expectedConfigs := append([]agent.Config{oldConfig}, newConfigs...)
+		config := makeConfig("test", tmpDir)
+		err = json.NewEncoder(f).Encode(config)
+		if err != nil {
+			t.Errorf("error writing old config:%v", err)
+			return
+		}
+		_ = f.Close()
 
-	if diff := cmp.Diff(expectedConfigs, gotConfigs); diff != "" {
-		t.Errorf("(--Want ++Got)\n%s", diff)
-		return
-	}
+		ma := mockAgent(func(ctx context.Context, config agent.Config) error {
 
-	expectedContextCauses = append(expectedContextCauses, context.DeadlineExceeded.Error())
-	if diff := cmp.Diff(expectedContextCauses, gotContextCauses); diff != "" {
-		t.Errorf("(--Want ++Got)\n%s", diff)
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+
+		})
+
+		p, _ := os.FindProcess(os.Getpid())
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			_ = p.Signal(syscall.SIGINT)
+		}()
+
+		pm := func(l *slog.Logger) agentProcess {
+			return ma
+		}
+		spawnAndReload(ctx, pm, cfgFileLocation)
+	})
+
+}
+
+var makeConfig = func(suffix string, tmpDir string) agent.Config {
+	return agent.Config{
+		Agent: agent.AgentConfig{
+			LogLevel: slog.LevelInfo,
+			LogFmt:   "json",
+			PIDFile:  tmpDir + "/agent.pid",
+		},
+		TemplateSpecs: map[string]*agent.TemplateConfig{
+			"templ1": {
+				Raw:         fmt.Sprintf("{{.Name_%s}}", suffix),
+				Destination: tmpDir + "/dest.render" + suffix,
+			},
+			"templ2": {
+				Raw:         "{{.ID}}",
+				Destination: tmpDir + "/dest2.render" + suffix,
+			},
+		},
 	}
 }

@@ -21,8 +21,6 @@ var sighupReceived = errors.New("context canceled: SIGHUP")
 const pidDir = "/tmp/tplagent"
 const pidFilename = "agent.pid"
 
-type semToken struct{}
-
 func main() {
 
 	configPath := flag.String("config", "/etc/tplagent/config.json", "-config=/path/to/config.json")
@@ -54,14 +52,11 @@ func spawnAndReload(rootCtx context.Context, processMaker func(logger *slog.Logg
 	sighup := make(chan os.Signal, 1)
 	signal.Notify(sighup, syscall.SIGHUP)
 
-	sem := make(chan semToken, 1)
 	spawnErrChan := make(chan error, 1)
 
-	acquireSem(sem)
 	go func() {
 		err := spawn(ctx, processMaker, configPath, false)
 		spawnErrChan <- err
-		releaseSem(sem)
 	}()
 
 	run := true
@@ -69,26 +64,34 @@ func spawnAndReload(rootCtx context.Context, processMaker func(logger *slog.Logg
 		select {
 		case <-sighup:
 			cancel(sighupReceived)
-			// spawn a new agent to reload config
-			acquireSem(sem)
+
+			err := <-spawnErrChan
+			if isFatal(err) {
+				_, _ = fmt.Fprintf(os.Stderr, "spawn error:%s\n", err.Error())
+				run = false
+				break
+			}
+
 			ctx, cancel = context.WithCancelCause(rootCtx)
 			go func() {
 				err := spawn(ctx, processMaker, configPath, true)
 				spawnErrChan <- err
-				releaseSem(sem)
 			}()
 		case err := <-spawnErrChan:
 			if isFatal(err) {
-				_, _ = fmt.Fprintf(os.Stderr, "spawn returned a fatal error %s", err.Error())
+				_, _ = fmt.Fprintf(os.Stderr, "spawn error:%s\n", err.Error())
 				run = false
 				cancel(err)
 			}
 		case <-ctx.Done():
+			err := <-spawnErrChan
+			if err != nil {
+				_, _ = fmt.Fprintf(os.Stderr, "spawn error:%s\n", err.Error())
+			}
 			cancel(ctx.Err())
 			// acquiring sem ensures that
 			// the last spawned process
 			// has completed its execution
-			acquireSem(sem)
 			run = false
 		}
 	}
@@ -105,7 +108,7 @@ func spawn(ctx context.Context, processMaker func(logger *slog.Logger) agentProc
 	logger := newLogger(logFmt, config.Agent.LogLevel)
 
 	if isReload {
-		logger.Info("config reloaded")
+		logger.Info("agent reloading")
 	}
 
 	proc := processMaker(logger)
@@ -116,14 +119,6 @@ func spawn(ctx context.Context, processMaker func(logger *slog.Logger) agentProc
 	}
 	logger.Info("agent exited without errors")
 	return nil
-}
-
-func acquireSem(sem chan semToken) {
-	sem <- semToken{}
-}
-
-func releaseSem(sem chan semToken) {
-	<-sem
 }
 
 var replacer = func(groups []string, a slog.Attr) slog.Attr {
