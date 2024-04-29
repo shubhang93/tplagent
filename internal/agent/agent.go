@@ -10,6 +10,7 @@ import (
 	"github.com/shubhang93/tplagent/internal/render"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -35,6 +36,7 @@ type sinkConfig struct {
 	renderOnce      bool
 	raw             string
 	readFrom        string
+	missingKey      string
 }
 
 type execConfig struct {
@@ -47,7 +49,7 @@ func Run(ctx context.Context, config Config) error {
 	logger.Info("starting agent")
 	templConfig := config.TemplateSpecs
 	scs := makeSinkExecConfigs(templConfig)
-	return renderAndRefresh(ctx, scs, renderAndExec, logger)
+	return startTickLoops(ctx, scs, renderAndExec, logger)
 }
 
 func makeSinkExecConfigs(templConfig map[string]*TemplateConfig) []sinkExecConfig {
@@ -67,9 +69,10 @@ func makeSinkExecConfigs(templConfig map[string]*TemplateConfig) []sinkExecConfi
 				name:            name,
 				renderOnce:      spec.RenderOnce,
 				raw:             spec.Raw,
+				missingKey:      spec.MissingKey,
 			},
 			execConfig: execConfig{
-				cmd:        spec.ExecCMD,
+				cmd:        strings.TrimSpace(spec.ExecCMD),
 				cmdTimeout: cmp.Or(time.Duration(spec.ExecTimeout), defaultExecTimeout),
 			},
 		}
@@ -78,27 +81,31 @@ func makeSinkExecConfigs(templConfig map[string]*TemplateConfig) []sinkExecConfi
 	return scs
 }
 
-type errMap map[string]error
-
-func (e errMap) Error() string {
-	var errs []error
-	for k, err := range e {
-		errs = append(errs, fmt.Errorf("%s:%w", k, err))
-	}
-	return errors.Join(errs...).Error()
+type templInitErr struct {
+	name string
+	err  error
 }
 
-func renderAndRefresh(ctx context.Context, scs []sinkExecConfig, tf tickFunc, l *slog.Logger) error {
+func (t templInitErr) Error() string {
+	return fmt.Sprintf("template init error for %s:%s", t.name, t.err.Error())
+}
+
+func startTickLoops(ctx context.Context, scs []sinkExecConfig, tf tickFunc, l *slog.Logger) error {
 	var wg sync.WaitGroup
 
-	initErrors := errMap{}
+	errsChan := make(chan error)
+
 	for i := range scs {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
 			sc := scs[idx]
 			if err := initTemplate(&sc); err != nil {
-				initErrors[sc.name] = fmt.Errorf("init template error for %s:%w", sc.name, err)
+				initErr := templInitErr{
+					name: sc.name,
+					err:  err,
+				}
+				errsChan <- initErr
 				l.Error("init template error", slog.String("error", err.Error()), slog.String("name", sc.name))
 				return
 			}
@@ -106,15 +113,26 @@ func renderAndRefresh(ctx context.Context, scs []sinkExecConfig, tf tickFunc, l 
 		}(i)
 	}
 
-	wg.Wait()
-	if len(initErrors) < 1 {
+	go func() {
+		wg.Wait()
+		close(errsChan)
+	}()
+
+	var initErrs []error
+	for err := range errsChan {
+		initErrs = append(initErrs, err)
+	}
+
+	if len(initErrs) < 1 {
 		return nil
 	}
-	return initErrors
+
+	return errors.Join(initErrs...)
 }
 
 func initTemplate(sc *sinkExecConfig) error {
 	at := actionable.NewTemplate(sc.name, sc.html)
+	at.SetMissingKeyBehaviour(sc.missingKey)
 	setTemplateDelims(at, sc.templateDelims)
 	if err := attachActions(at, sc.actions); err != nil {
 		return err
@@ -133,6 +151,8 @@ func startRenderLoop(ctx context.Context, cfg sinkExecConfig, onTick func(contex
 		Templ:   cfg.parsed,
 		WriteTo: cfg.dest,
 	}
+
+	defer cfg.parsed.CloseActions()
 
 	if cfg.renderOnce {
 		if err := onTick(ctx, cfg, sink); err != nil {
@@ -205,4 +225,8 @@ var replacer = func(groups []string, a slog.Attr) slog.Attr {
 		return slog.String(a.Key, a.Value.Time().Format(time.DateTime))
 	}
 	return a
+}
+
+func closeActions() {
+
 }

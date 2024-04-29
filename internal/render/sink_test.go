@@ -56,6 +56,10 @@ func TestSink_Render(t *testing.T) {
 			return
 		}
 
+		_, err = os.Stat(rdr.WriteTo + ".temp")
+		if !errors.Is(err, expectedErr) {
+			t.Error("temp file found")
+		}
 	})
 
 	t.Run("dest file already exists", func(t *testing.T) {
@@ -109,12 +113,10 @@ func TestSink_Render(t *testing.T) {
 			t.Errorf("expected backup content: %s\n got:%s\n", expectedBackupContent, string(bs))
 		}
 
-		// just to verify it rename
-		// replaces the backup file
-		// if one exists
-		if err := os.Rename(renderPath, renderPath+".bak"); err != nil {
-			t.Errorf("failed to rename:%v", err)
+		if _, err := os.Stat(rdr.WriteTo + ".temp"); !os.IsNotExist(err) {
+			t.Error("temp file found")
 		}
+
 	})
 
 	t.Run("create intermediate paths if none exists", func(t *testing.T) {

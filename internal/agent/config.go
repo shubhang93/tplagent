@@ -16,11 +16,10 @@ var allowedLogFmts = map[string]struct{}{
 	"text": {},
 }
 
-var noTimeout = time.Duration(0)
-
 type AgentConfig struct {
 	LogLevel slog.Level `json:"log_level"`
 	LogFmt   string     `json:"log_fmt"`
+	PIDFile  string     `json:"pid_file"`
 }
 
 type Duration time.Duration
@@ -49,10 +48,10 @@ type TemplateConfig struct {
 	Raw                string         `json:"raw"`
 	Destination        string         `json:"destination"`
 	HTML               bool           `json:"html"`
-
-	StaticData      any      `json:"static_data"`
-	RefreshInterval Duration `json:"refresh_interval"`
-	RenderOnce      bool     `json:"render_once"`
+	StaticData         any            `json:"static_data"`
+	RefreshInterval    Duration       `json:"refresh_interval"`
+	RenderOnce         bool           `json:"render_once"`
+	MissingKey         string         `json:"missing_key"`
 
 	// command exec config
 	ExecCMD     string   `json:"exec_cmd"`
@@ -65,7 +64,7 @@ type Config struct {
 }
 
 func ReadConfigFromFile(path string) (Config, error) {
-	confFile, err := os.Open(path)
+	confFile, err := os.Open(os.ExpandEnv(path))
 	if err != nil {
 		return Config{}, fmt.Errorf("config file read error:%w", err)
 	}

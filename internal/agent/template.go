@@ -2,16 +2,13 @@ package agent
 
 import (
 	"fmt"
+	"github.com/shubhang93/tplagent/internal/actionable"
 	"github.com/shubhang93/tplagent/internal/tplactions"
 	"os"
 	"text/template"
 )
 
-type actionableTemplate interface {
-	Funcs(actions map[string]any)
-}
-
-func attachActions(t actionableTemplate, templActions []ActionConfig) error {
+func attachActions(t *actionable.Template, templActions []ActionConfig) error {
 	namesSpacedFuncMap := make(template.FuncMap)
 	for _, ta := range templActions {
 		actionMaker, ok := tplactions.Registry[ta.Name]
@@ -22,6 +19,7 @@ func attachActions(t actionableTemplate, templActions []ActionConfig) error {
 		if err := action.SetConfig(ta.Config); err != nil {
 			return fmt.Errorf("error setting config for %s", ta.Name)
 		}
+		t.AddAction(action)
 		fm := action.FuncMap()
 		for name, f := range fm {
 			funcNameWithNS := []byte(ta.Name)
@@ -42,11 +40,7 @@ func attachActions(t actionableTemplate, templActions []ActionConfig) error {
 	return nil
 }
 
-type delimitableTemplate interface {
-	Delims(l, r string)
-}
-
-func setTemplateDelims(t delimitableTemplate, delims []string) {
+func setTemplateDelims(t *actionable.Template, delims []string) {
 	if len(delims) < 2 {
 		return
 	}
@@ -54,11 +48,7 @@ func setTemplateDelims(t delimitableTemplate, delims []string) {
 	t.Delims(left, right)
 }
 
-type parseableTemplate interface {
-	Parse(text string) error
-}
-
-func parseTemplate(raw string, readFrom string, pt parseableTemplate) error {
+func parseTemplate(raw string, readFrom string, pt *actionable.Template) error {
 	if raw != "" {
 		return pt.Parse(raw)
 	}
@@ -69,5 +59,4 @@ func parseTemplate(raw string, readFrom string, pt parseableTemplate) error {
 	}
 
 	return pt.Parse(string(bs))
-
 }

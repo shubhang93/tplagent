@@ -3,6 +3,7 @@ package agent
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/shubhang93/tplagent/internal/actionable"
@@ -10,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"slices"
+	"sync"
 	"testing"
 	"text/template"
 	"time"
@@ -188,7 +190,7 @@ func Test_renderLoop(t *testing.T) {
 		t.Log(err)
 	})
 
-	t.Run("all templates in renderAndRefresh fail to initialize", func(t *testing.T) {
+	t.Run("all templates in startTickLoops fail to initialize", func(t *testing.T) {
 		scs := []sinkExecConfig{
 			{
 				sinkConfig: sinkConfig{
@@ -213,7 +215,7 @@ func Test_renderLoop(t *testing.T) {
 		tf := tickFunc(func(ctx context.Context, config sinkExecConfig, sink render.Sink) error {
 			return nil
 		})
-		err := renderAndRefresh(context.Background(), scs, tf, newLogger())
+		err := startTickLoops(context.Background(), scs, tf, newLogger())
 		if err == nil {
 			t.Error("expected error but got nil")
 			return
@@ -222,6 +224,91 @@ func Test_renderLoop(t *testing.T) {
 	})
 
 	t.Run("test render and refresh for a valid config", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5000*time.Millisecond)
+		defer cancel()
+
+		templ1 := `Name: {{.name}}`
+		templ2 := `<div>{{.name}}</div>`
+
+		src1 := tmpDir + "/test1.tmpl"
+		src2 := tmpDir + "/test2.tmpl"
+
+		err := os.WriteFile(src1, []byte(templ1), 0755)
+		if err != nil {
+			t.Errorf("error writing src1:%v", err)
+			return
+		}
+		err = os.WriteFile(src2, []byte(templ2), 0755)
+		if err != nil {
+			t.Errorf("error writing src2:%v", err)
+			return
+		}
+
+		dest1 := tmpDir + "/test1.render"
+		dest2 := tmpDir + "/dest2.render"
+
+		configs := []sinkExecConfig{{
+			sinkConfig: sinkConfig{
+				refreshInterval: 1 * time.Second,
+				dest:            dest1,
+				staticData:      map[string]string{"name": "foo"},
+				name:            "template1",
+				readFrom:        src1,
+			},
+		}, {
+			sinkConfig: sinkConfig{
+				refreshInterval: 1 * time.Second,
+				dest:            dest2,
+				staticData:      map[string]string{"name": "foo"},
+				name:            "template2",
+				readFrom:        src2,
+			},
+			execConfig: execConfig{
+				cmd: `echo hello`,
+			},
+		}}
+
+		var mu sync.Mutex
+		loopRunCounts := map[string]int{}
+		tf := tickFunc(func(ctx context.Context, config sinkExecConfig, sink render.Sink) error {
+			if err := renderAndExec(ctx, config, sink); err != nil && !errors.Is(err, context.DeadlineExceeded) {
+				t.Errorf("renderAndExec failed for %s:%v", config.name, err)
+			}
+			mu.Lock()
+			loopRunCounts[config.cmd]++
+			mu.Unlock()
+			return nil
+		})
+		if err := startTickLoops(ctx, configs, tf, newLogger()); err != nil {
+			t.Errorf("startTickLoops failed with error:%v", err)
+		}
+		for name, lrc := range loopRunCounts {
+			if lrc < 5 {
+				t.Errorf("loop run count for %s < 5", name)
+				return
+			}
+		}
+		bs, err := os.ReadFile(dest1)
+		if err != nil {
+			t.Errorf("error reading dest1:%v", err)
+			return
+		}
+		expectedContent1 := `Name: foo`
+		if string(bs) != expectedContent1 {
+			t.Errorf("expectedContent1:\n%s got:\n%s", expectedContent1, string(bs))
+			return
+		}
+
+		expectedContent2 := `<div>foo</div>`
+		bs, err = os.ReadFile(dest2)
+		if err != nil {
+			t.Errorf("error reading dest2:%v", err)
+			return
+		}
+		if string(bs) != expectedContent2 {
+			t.Errorf("expectedContent2:\n%s got:\n%s", expectedContent2, string(bs))
+			return
+		}
 
 	})
 }

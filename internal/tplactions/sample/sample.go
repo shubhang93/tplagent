@@ -11,29 +11,31 @@ type Config struct {
 	GreetMessage string
 }
 
-type Provider struct {
+type SampleAction struct {
 	config *Config
 }
 
-func (p *Provider) FuncMap() template.FuncMap {
+func (sa *SampleAction) FuncMap() template.FuncMap {
 	return template.FuncMap{
 		"greet": func(s string) string {
-			return fmt.Sprintf("%s ==> %s", p.config.GreetMessage, s)
+			return fmt.Sprintf("%s %s", sa.config.GreetMessage, s)
 		},
 	}
 }
 
-func (p *Provider) SetConfig(bs []byte) error {
+func (sa *SampleAction) SetConfig(bs []byte) error {
 	var c Config
 	if err := json.Unmarshal(bs, &c); err != nil {
 		return err
 	}
-	p.config = &c
+	sa.config = &c
 	return nil
 }
 
+func (sa *SampleAction) Close() {}
+
 func init() {
 	tplactions.Register("sample", func() tplactions.Interface {
-		return &Provider{}
+		return &SampleAction{}
 	})
 }
