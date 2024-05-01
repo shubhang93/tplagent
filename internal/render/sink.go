@@ -1,7 +1,7 @@
 package render
 
 import (
-	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -18,14 +18,19 @@ type executableTemplate interface {
 }
 
 type Sink struct {
-	Templ      executableTemplate
-	WriteTo    string
-	buffWriter *bufio.Writer
-	copyBuffer []byte
+	Templ        executableTemplate
+	WriteTo      string
+	fileContents *bytes.Buffer
+	copyBuffer   []byte
 }
 
 func (s *Sink) Render(staticData any) error {
 	s.init()
+
+	defer func() {
+		clear(s.copyBuffer)
+		s.fileContents.Reset()
+	}()
 
 	if err := ensureDestDirs(s.WriteTo); err != nil {
 		return err
@@ -37,29 +42,46 @@ func (s *Sink) Render(staticData any) error {
 		return err
 	}
 
-	s.buffWriter.Reset(tempFile)
-	if err := renderTempl(s.Templ, s.buffWriter, staticData); err != nil {
+	s.fileContents.Reset()
+	if err := renderTempl(s.Templ, s.fileContents, staticData); err != nil {
 		return err
+	}
+	oldFileContents, err := os.ReadFile(s.WriteTo)
+	switch {
+	case err == nil:
+		if bytes.Equal(oldFileContents, s.fileContents.Bytes()) {
+			return nil
+		}
+	case errors.Is(err, os.ErrNotExist):
+	default:
+		return fmt.Errorf("error reading old file contents:%w", err)
 	}
 
 	oldFile, err := os.Open(s.WriteTo)
 
 	switch {
 	case err == nil:
-		clear(s.copyBuffer)
 		bakFileName := fmt.Sprintf("%s.%s", s.WriteTo, bakFileExt)
 		bakFile, err := createWritableFile(bakFileName)
 		if err != nil {
 			return err
 		}
-		_, err = io.CopyBuffer(bakFile, oldFile, s.copyBuffer)
+		err = makeBackup(bakFile, oldFile, s.copyBuffer)
 		if err != nil {
 			return fmt.Errorf("failed to backup file:%w", err)
 		}
+
+		if err := writeTempFile(tempFile, s.fileContents, s.copyBuffer); err != nil {
+			return fmt.Errorf("error writing to temp file:%w", err)
+		}
+
 		if err := os.Rename(tempFile.Name(), s.WriteTo); err != nil {
 			return fmt.Errorf("error renaming file:%w", err)
 		}
 	case errors.Is(err, os.ErrNotExist):
+		if err := writeTempFile(tempFile, s.fileContents, s.copyBuffer); err != nil {
+			return fmt.Errorf("error writing to temp file:%w", err)
+		}
 		if err := os.Rename(tempFile.Name(), s.WriteTo); err != nil {
 			return fmt.Errorf("error renaming file:%w", err)
 		}
@@ -69,9 +91,26 @@ func (s *Sink) Render(staticData any) error {
 	return nil
 }
 
+func makeBackup(bakFile *os.File, oldFile *os.File, buff []byte) error {
+	clear(buff)
+	_, err := io.CopyBuffer(bakFile, oldFile, buff)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func writeTempFile(tempFile *os.File, contents *bytes.Buffer, buff []byte) error {
+	clear(buff)
+	if _, err := io.CopyBuffer(tempFile, contents, buff); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *Sink) init() {
-	if s.buffWriter == nil {
-		s.buffWriter = bufio.NewWriter(nil)
+	if s.fileContents == nil {
+		s.fileContents = &bytes.Buffer{}
 	}
 	if s.copyBuffer == nil {
 		s.copyBuffer = make([]byte, 4096)
@@ -93,7 +132,7 @@ func ensureDestDirs(filename string) error {
 }
 
 func createWritableFile(filename string) (*os.File, error) {
-	fi, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0777)
+	fi, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, mode)
 	if err != nil {
 		return nil, err
 	}
@@ -103,9 +142,8 @@ func createWritableFile(filename string) (*os.File, error) {
 	return fi, nil
 }
 
-func renderTempl(t executableTemplate, buffWr *bufio.Writer, staticData any) error {
-	defer buffWr.Flush()
-	if err := t.Execute(buffWr, staticData); err != nil {
+func renderTempl(t executableTemplate, wr io.Writer, staticData any) error {
+	if err := t.Execute(wr, staticData); err != nil {
 		return fmt.Errorf("error writing dest file:%w", err)
 	}
 	return nil

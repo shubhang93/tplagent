@@ -101,6 +101,7 @@ func TestSink_Render(t *testing.T) {
 		expectedContent := `Name: baz`
 		if expectedContent != string(bs) {
 			t.Errorf("expected:%s got:%s", expectedContent, string(bs))
+			return
 		}
 
 		bs, err = os.ReadFile(renderPath + ".bak")
