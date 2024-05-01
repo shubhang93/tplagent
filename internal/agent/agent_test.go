@@ -32,11 +32,14 @@ func Test_makeSinkExecConfigs(t *testing.T) {
 				StaticData:      map[string]any{},
 				RefreshInterval: Duration(1 * time.Second),
 				RenderOnce:      true,
-				ExecCMD:         "echo hello",
-				ExecTimeout:     Duration(5 * time.Second),
+				Exec: &ExecConfig{
+					Cmd:        "echo",
+					CmdArgs:    []string{"hello"},
+					CmdTimeout: Duration(5 * time.Second),
+				},
 			},
 			"testconfig2": {
-				Actions: []ActionConfig{{
+				Actions: []ActionsConfig{{
 					Name:   "httpJson",
 					Config: []byte(`{"key":"value"}`),
 				}},
@@ -44,7 +47,10 @@ func Test_makeSinkExecConfigs(t *testing.T) {
 				HTML:               true,
 				StaticData:         map[string]any{},
 				RenderOnce:         true,
-				ExecCMD:            "echo hello",
+				Exec: &ExecConfig{
+					Cmd:     "echo",
+					CmdArgs: []string{"hello"},
+				},
 			},
 		}
 
@@ -59,8 +65,9 @@ func Test_makeSinkExecConfigs(t *testing.T) {
 					renderOnce:      true,
 					readFrom:        homeDir + "/testdir",
 				},
-				execConfig: execConfig{
-					cmd:        "echo hello",
+				execConfig: &execConfig{
+					cmd:        "echo",
+					args:       []string{"hello"},
 					cmdTimeout: 5 * time.Second,
 				},
 			},
@@ -68,7 +75,7 @@ func Test_makeSinkExecConfigs(t *testing.T) {
 				sinkConfig: sinkConfig{
 					html:           true,
 					templateDelims: []string{"<<", ">>"},
-					actions: []ActionConfig{{
+					actions: []ActionsConfig{{
 						Name:   "httpJson",
 						Config: []byte(`{"key":"value"}`),
 					}},
@@ -76,8 +83,9 @@ func Test_makeSinkExecConfigs(t *testing.T) {
 					name:       "testconfig2",
 					renderOnce: true,
 				},
-				execConfig: execConfig{
-					cmd:        "echo hello",
+				execConfig: &execConfig{
+					cmd:        "echo",
+					args:       []string{"hello"},
 					cmdTimeout: 60 * time.Second,
 				},
 			}}
@@ -122,8 +130,9 @@ func Test_renderLoop(t *testing.T) {
 				staticData:      map[string]any{"name": "foo"},
 				name:            "test-tmpl",
 			},
-			execConfig: execConfig{
-				cmd:        `echo "rendered"`,
+			execConfig: &execConfig{
+				cmd:        `echo`,
+				args:       []string{"hello"},
 				cmdTimeout: 30 * time.Second,
 			},
 		},
@@ -139,8 +148,9 @@ func Test_renderLoop(t *testing.T) {
 				staticData:      map[string]any{"name": "foo"},
 				name:            "test-tmpl",
 			},
-			execConfig: execConfig{
-				cmd:        `echo "rendered"`,
+			execConfig: &execConfig{
+				cmd:        `echo`,
+				args:       []string{"hello"},
 				cmdTimeout: 30 * time.Second,
 			},
 		},
@@ -194,7 +204,7 @@ func Test_renderLoop(t *testing.T) {
 			}, {
 				sinkConfig: sinkConfig{
 					name: "nonExistentAction",
-					actions: []ActionConfig{{
+					actions: []ActionsConfig{{
 						Name:   "fooaction",
 						Config: nil,
 					}},
@@ -257,8 +267,9 @@ func Test_renderLoop(t *testing.T) {
 				name:            "template2",
 				readFrom:        src2,
 			},
-			execConfig: execConfig{
-				cmd: `echo hello`,
+			execConfig: &execConfig{
+				cmd:  `echo`,
+				args: []string{"hello"},
 			},
 		}}
 

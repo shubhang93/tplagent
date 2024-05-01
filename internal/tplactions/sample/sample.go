@@ -8,14 +8,14 @@ import (
 )
 
 type Config struct {
-	GreetMessage string
+	GreetMessage string `json:"greet_message"`
 }
 
-type SampleAction struct {
+type Actions struct {
 	config *Config
 }
 
-func (sa *SampleAction) FuncMap() template.FuncMap {
+func (sa *Actions) FuncMap() template.FuncMap {
 	return template.FuncMap{
 		"greet": func(s string) string {
 			return fmt.Sprintf("%s %s", sa.config.GreetMessage, s)
@@ -23,7 +23,7 @@ func (sa *SampleAction) FuncMap() template.FuncMap {
 	}
 }
 
-func (sa *SampleAction) SetConfig(bs []byte) error {
+func (sa *Actions) SetConfig(bs []byte) error {
 	var c Config
 	if err := json.Unmarshal(bs, &c); err != nil {
 		return err
@@ -32,10 +32,10 @@ func (sa *SampleAction) SetConfig(bs []byte) error {
 	return nil
 }
 
-func (sa *SampleAction) Close() {}
+func (sa *Actions) Close() {}
 
 func init() {
 	tplactions.Register("sample", func() tplactions.Interface {
-		return &SampleAction{}
+		return &Actions{}
 	})
 }

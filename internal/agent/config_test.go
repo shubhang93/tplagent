@@ -43,6 +43,12 @@ func Test_readConfig(t *testing.T) {
     "test-config": {
       "refresh_interval": "10s",
       "exec_cmd": "echo \"rendererd\"",
+      "exec": {
+        "cmd": "echo",
+        "cmd_args": [
+          "rendered"
+        ]
+      },
       "source": "/etc/tmpl/test.tmpl",
       "destination": "/etc/config/test.cfg",
       "actions": [
@@ -56,7 +62,12 @@ func Test_readConfig(t *testing.T) {
     },
     "test-config2": {
       "refresh_interval": "5s",
-      "exec_cmd": "echo \"rendererd\"",
+      "exec": {
+        "cmd": "echo",
+        "cmd_args": [
+          "rendered"
+        ]
+      },
       "source": "/etc/tmpl/test.tmpl",
       "destination": "/etc/config/test.cfg"
     }
@@ -71,10 +82,14 @@ func Test_readConfig(t *testing.T) {
 			TemplateSpecs: map[string]*TemplateConfig{
 				"test-config": {
 					RefreshInterval: Duration(10 * time.Second),
-					ExecCMD:         `echo "rendererd"`,
-					Source:          "/etc/tmpl/test.tmpl",
-					Destination:     "/etc/config/test.cfg",
-					Actions: []ActionConfig{
+					//ExecCMD:         `echo "rendererd"`,
+					Exec: &ExecConfig{
+						Cmd:     "echo",
+						CmdArgs: []string{"rendered"},
+					},
+					Source:      "/etc/tmpl/test.tmpl",
+					Destination: "/etc/config/test.cfg",
+					Actions: []ActionsConfig{
 						{
 							Name: "test_provider",
 							Config: json.RawMessage(`{
@@ -85,9 +100,12 @@ func Test_readConfig(t *testing.T) {
 				},
 				"test-config2": {
 					RefreshInterval: Duration(5 * time.Second),
-					ExecCMD:         `echo "rendererd"`,
-					Source:          "/etc/tmpl/test.tmpl",
-					Destination:     "/etc/config/test.cfg",
+					Exec: &ExecConfig{
+						Cmd:     "echo",
+						CmdArgs: []string{"rendered"},
+					},
+					Source:      "/etc/tmpl/test.tmpl",
+					Destination: "/etc/config/test.cfg",
 				},
 			},
 		}
@@ -111,7 +129,7 @@ func Test_readConfig(t *testing.T) {
 			TemplateSpecs: map[string]*TemplateConfig{
 				"templ-conf": {
 					RefreshInterval: Duration(500 * time.Millisecond),
-					Actions:         []ActionConfig{{}},
+					Actions:         []ActionsConfig{{}},
 				},
 				"templ-conf2": {
 					RefreshInterval: Duration(1 * time.Second),

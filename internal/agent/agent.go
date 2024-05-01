@@ -20,7 +20,7 @@ const defaultExecTimeout = 60 * time.Second
 
 type sinkExecConfig struct {
 	sinkConfig
-	execConfig
+	*execConfig
 }
 
 type tickFunc func(ctx context.Context, config sinkExecConfig, sink render.Sink) error
@@ -30,7 +30,7 @@ type sinkConfig struct {
 	refreshInterval time.Duration
 	html            bool
 	templateDelims  []string
-	actions         []ActionConfig
+	actions         []ActionsConfig
 	dest            string
 	staticData      any
 	name            string
@@ -43,6 +43,7 @@ type sinkConfig struct {
 type execConfig struct {
 	cmd        string
 	cmdTimeout time.Duration
+	args       []string
 }
 
 type Process struct {
@@ -76,10 +77,15 @@ func makeSinkExecConfigs(templConfig map[string]*TemplateConfig) []sinkExecConfi
 				raw:             spec.Raw,
 				missingKey:      strings.TrimSpace(spec.MissingKey),
 			},
-			execConfig: execConfig{
-				cmd:        strings.TrimSpace(spec.ExecCMD),
-				cmdTimeout: cmp.Or(time.Duration(spec.ExecTimeout), defaultExecTimeout),
-			},
+		}
+
+		specExec := spec.Exec
+		if specExec != nil {
+			var ec execConfig
+			ec.args = expandEnvs(specExec.CmdArgs)
+			ec.cmd = specExec.Cmd
+			ec.cmdTimeout = cmp.Or(time.Duration(specExec.CmdTimeout), defaultExecTimeout)
+			scs[i].execConfig = &ec
 		}
 		i++
 	}
@@ -106,11 +112,10 @@ func (p *Process) startTickLoops(ctx context.Context, tf tickFunc) error {
 			defer wg.Done()
 			sc := p.configs[idx]
 			if err := initTemplate(&sc); err != nil {
-				initErr := fatal.NewError(
-					templInitErr{
-						name: sc.name,
-						err:  err,
-					})
+				initErr := templInitErr{
+					name: sc.name,
+					err:  err,
+				}
 				errsChan <- initErr
 				p.Logger.Error("init template error", slog.String("error", err.Error()), slog.String("name", sc.name))
 				return
@@ -131,6 +136,10 @@ func (p *Process) startTickLoops(ctx context.Context, tf tickFunc) error {
 
 	if len(initErrs) < 1 {
 		return nil
+	}
+
+	if len(initErrs) == len(p.configs) {
+		return fatal.NewError(errors.Join(initErrs...))
 	}
 
 	return errors.Join(initErrs...)
@@ -198,16 +207,23 @@ func renderAndExec(ctx context.Context, cfg sinkExecConfig, sink render.Sink) er
 		return err
 	}
 
-	if cfg.cmd == "" {
+	if cfg.execConfig == nil {
 		return nil
 	}
 
 	cmdCtx, cancel := context.WithTimeout(ctx, cfg.cmdTimeout)
 	defer cancel()
-	if err := cmdexec.Do(cmdCtx, cfg.cmd); err != nil {
+	if err := cmdexec.Do(cmdCtx, cfg.cmd, cfg.execConfig.args...); err != nil {
 		return err
 	}
 
 	return nil
 
+}
+
+func expandEnvs(args []string) []string {
+	for i := range args {
+		args[i] = os.ExpandEnv(args[i])
+	}
+	return args
 }

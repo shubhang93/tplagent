@@ -20,10 +20,18 @@ var allowedLogFmts = map[string]struct{}{
 type AgentConfig struct {
 	LogLevel slog.Level `json:"log_level"`
 	LogFmt   string     `json:"log_fmt"`
-	PIDFile  string     `json:"pid_file"`
 }
 
 type Duration time.Duration
+
+func (r *Duration) MarshalJSON() ([]byte, error) {
+
+	bs := []byte{'"'}
+	bs = append(bs)
+	bs = append(bs, time.Duration(*r).String()...)
+	bs = append(bs, '"')
+	return bs, nil
+}
 
 func (r *Duration) UnmarshalJSON(bs []byte) error {
 	bs = bytes.Trim(bs, `"`)
@@ -35,28 +43,32 @@ func (r *Duration) UnmarshalJSON(bs []byte) error {
 	return nil
 }
 
-type ActionConfig struct {
+type ActionsConfig struct {
 	Name   string          `json:"name"`
 	Config json.RawMessage `json:"config"`
+}
+
+type ExecConfig struct {
+	Cmd        string   `json:"cmd"`
+	CmdArgs    []string `json:"cmd_args"`
+	CmdTimeout Duration `json:"cmd_timeout"`
 }
 
 type TemplateConfig struct {
 	// required for
 	// creation of template
-	Actions            []ActionConfig `json:"actions"`
-	TemplateDelimiters []string       `json:"template_delimiters"`
-	Source             string         `json:"source"`
-	Raw                string         `json:"raw"`
-	Destination        string         `json:"destination"`
-	HTML               bool           `json:"html"`
-	StaticData         any            `json:"static_data"`
-	RefreshInterval    Duration       `json:"refresh_interval"`
-	RenderOnce         bool           `json:"render_once"`
-	MissingKey         string         `json:"missing_key"`
+	Actions            []ActionsConfig `json:"actions"`
+	TemplateDelimiters []string        `json:"template_delimiters"`
+	Source             string          `json:"source"`
+	Raw                string          `json:"raw"`
+	Destination        string          `json:"destination"`
+	HTML               bool            `json:"html"`
+	StaticData         any             `json:"static_data"`
+	RefreshInterval    Duration        `json:"refresh_interval"`
+	RenderOnce         bool            `json:"render_once"`
+	MissingKey         string          `json:"missing_key"`
 
-	// command exec config
-	ExecCMD     string   `json:"exec_cmd"`
-	ExecTimeout Duration `json:"exec_timeout"`
+	Exec *ExecConfig `json:"exec"`
 }
 
 type Config struct {
@@ -125,7 +137,7 @@ func validateConfig(c *Config) error {
 
 }
 
-func validateActionConfigs(actions []ActionConfig) error {
+func validateActionConfigs(actions []ActionsConfig) error {
 	var provValErrs []error
 	for i := range actions {
 		if actions[i].Name == "" {

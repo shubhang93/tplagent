@@ -8,7 +8,7 @@ import (
 	"text/template"
 )
 
-func attachActions(t *actionable.Template, templActions []ActionConfig) error {
+func attachActions(t *actionable.Template, templActions []ActionsConfig) error {
 	namesSpacedFuncMap := make(template.FuncMap)
 	for _, ta := range templActions {
 		actionMaker, ok := tplactions.Registry[ta.Name]

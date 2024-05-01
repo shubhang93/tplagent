@@ -38,7 +38,6 @@ func (tt *Template) Funcs(actions map[string]any) {
 		tt.html.Funcs(actions)
 		return
 	}
-
 	tt.text.Funcs(actions)
 }
 

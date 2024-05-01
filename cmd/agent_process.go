@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"github.com/shubhang93/tplagent/internal/agent"
 	"log/slog"
@@ -22,25 +21,25 @@ const pidDir = "/tmp/tplagent"
 const pidFilename = "agent.pid"
 
 func main() {
+	args := os.Args[1:]
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer cancel()
+	cli(ctx, os.Stdout, os.Stderr, args...)
 
-	configPath := flag.String("config", "/etc/tplagent/config.json", "-config=/path/to/config.json")
-	flag.Parse()
+}
 
+func startAgent(ctx context.Context, configFilePath string) {
 	pid := os.Getpid()
 	writePID(pid)
 	defer func() {
 		_ = os.Remove(pidDir)
 	}()
 
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	defer cancel()
-
 	processMaker := func(l *slog.Logger) agentProcess {
 		return &agent.Process{Logger: l}
 	}
 
-	spawnAndReload(ctx, processMaker, *configPath)
-
+	spawnAndReload(ctx, processMaker, configFilePath)
 }
 
 type agentProcess interface {

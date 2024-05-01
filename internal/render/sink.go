@@ -11,6 +11,7 @@ import (
 
 const tempFileExt = "temp"
 const bakFileExt = "bak"
+const mode = os.FileMode(0766)
 
 type executableTemplate interface {
 	Execute(io.Writer, any) error
@@ -46,7 +47,6 @@ func (s *Sink) Render(staticData any) error {
 	switch {
 	case err == nil:
 		clear(s.copyBuffer)
-
 		bakFileName := fmt.Sprintf("%s.%s", s.WriteTo, bakFileExt)
 		bakFile, err := createWritableFile(bakFileName)
 		if err != nil {
@@ -80,15 +80,27 @@ func (s *Sink) init() {
 
 func ensureDestDirs(filename string) error {
 	dirPath := filepath.Dir(filename)
-	err := os.MkdirAll(dirPath, 0755)
+	err := os.MkdirAll(dirPath, mode)
 	if err != nil {
 		return fmt.Errorf("failed to create dir path:%s:%w", dirPath, err)
 	}
+	err = os.Chmod(dirPath, mode)
+	if err != nil {
+		return fmt.Errorf("failed to change perms on dir:%s:%w", dirPath, err)
+	}
+
 	return nil
 }
 
 func createWritableFile(filename string) (*os.File, error) {
-	return os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	fi, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0777)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.Chmod(fi.Name(), mode); err != nil {
+		return nil, err
+	}
+	return fi, nil
 }
 
 func renderTempl(t executableTemplate, buffWr *bufio.Writer, staticData any) error {

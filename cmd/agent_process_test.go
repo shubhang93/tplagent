@@ -161,7 +161,6 @@ var makeConfig = func(suffix string, tmpDir string) agent.Config {
 		Agent: agent.AgentConfig{
 			LogLevel: slog.LevelInfo,
 			LogFmt:   "json",
-			PIDFile:  tmpDir + "/agent.pid",
 		},
 		TemplateSpecs: map[string]*agent.TemplateConfig{
 			"templ1": {
