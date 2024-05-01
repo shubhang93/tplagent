@@ -86,7 +86,7 @@ func Test_makeSinkExecConfigs(t *testing.T) {
 				execConfig: &execConfig{
 					cmd:        "echo",
 					args:       []string{"hello"},
-					cmdTimeout: 60 * time.Second,
+					cmdTimeout: 30 * time.Second,
 				},
 			}}
 

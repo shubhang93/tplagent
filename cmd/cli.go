@@ -43,7 +43,7 @@ var configForGenerate = agent.Config{
 	},
 }
 
-func createCommandFuncs(stdout io.Writer, stderr io.Writer) map[string]func(ctx context.Context) {
+func createCommandHandlers(stdout io.Writer, stderr io.Writer) map[string]func(ctx context.Context) {
 	return map[string]func(context.Context){
 		"start": func(ctx context.Context) {
 			flag.Parse()
@@ -62,13 +62,13 @@ func createCommandFuncs(stdout io.Writer, stderr io.Writer) map[string]func(ctx 
 
 var usage = `usage: tplagent <start|generate> -config=/path/to/config`
 
-func cli(ctx context.Context, stdout, stderr io.Writer, args ...string) {
+func runCLI(ctx context.Context, stdout, stderr io.Writer, args ...string) {
 	if len(args) < 1 {
 		_, _ = fmt.Fprintln(stderr, usage)
 		os.Exit(1)
 	}
 	cmd := args[0]
-	cfs := createCommandFuncs(stdout, stderr)
+	cfs := createCommandHandlers(stdout, stderr)
 	f, ok := cfs[cmd]
 	if !ok {
 		_, _ = fmt.Fprintln(stderr, usage)

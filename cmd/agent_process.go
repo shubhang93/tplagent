@@ -24,7 +24,7 @@ func main() {
 	args := os.Args[1:]
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
-	cli(ctx, os.Stdout, os.Stderr, args...)
+	runCLI(ctx, os.Stdout, os.Stderr, args...)
 
 }
 

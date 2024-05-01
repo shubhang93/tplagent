@@ -57,15 +57,15 @@ type ExecConfig struct {
 type TemplateConfig struct {
 	// required for
 	// creation of template
-	Actions            []ActionsConfig `json:"actions"`
-	TemplateDelimiters []string        `json:"template_delimiters"`
-	Source             string          `json:"source"`
-	Raw                string          `json:"raw"`
-	Destination        string          `json:"destination"`
+	Actions            []ActionsConfig `json:"actions,omitempty"`
+	TemplateDelimiters []string        `json:"template_delimiters,omitempty"`
+	Source             string          `json:"source,omitempty"`
+	Raw                string          `json:"raw,omitempty"`
+	Destination        string          `json:"destination,omitempty"`
 	HTML               bool            `json:"html"`
-	StaticData         any             `json:"static_data"`
-	RefreshInterval    Duration        `json:"refresh_interval"`
-	RenderOnce         bool            `json:"render_once"`
+	StaticData         any             `json:"static_data,omitempty"`
+	RefreshInterval    Duration        `json:"refresh_interval,omitempty"`
+	RenderOnce         bool            `json:"render_once,omitempty"`
 	MissingKey         string          `json:"missing_key"`
 
 	Exec *ExecConfig `json:"exec"`

@@ -19,7 +19,7 @@ func Test_cli(t *testing.T) {
 	t.Run("test generate", func(t *testing.T) {
 		stdout := bytes.Buffer{}
 		expected := bytes.Buffer{}
-		cli(context.Background(), &stdout, os.Stderr, "generate")
+		runCLI(context.Background(), &stdout, os.Stderr, "generate")
 
 		jd := json.NewEncoder(&expected)
 		jd.SetIndent("", " ")
@@ -84,7 +84,7 @@ Sample Action:{{ sample_greet .name -}}`,
 		defer cancel()
 
 		_ = flag.Set("config", configFilePath)
-		cli(ctx, os.Stdout, os.Stderr, "start")
+		runCLI(ctx, os.Stdout, os.Stderr, "start")
 
 		d, err := os.ReadFile(dest)
 		if err != nil {

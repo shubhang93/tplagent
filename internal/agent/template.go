@@ -27,7 +27,6 @@ func attachActions(t *actionable.Template, templActions []ActionsConfig) error {
 			funcNameWithNS = append(funcNameWithNS, name...)
 			namesSpacedFuncMap[string(funcNameWithNS)] = f
 		}
-
 	}
 	// template.Funcs validates
 	// function names in the FuncMap
