@@ -55,7 +55,7 @@ func (p *Process) Start(ctx context.Context, config Config) error {
 	templConfig := config.TemplateSpecs
 	scs := makeSinkExecConfigs(templConfig)
 	p.configs = scs
-	return p.startTickLoops(ctx, renderAndExec)
+	return p.startTickLoops(ctx, p.renderAndExec)
 }
 
 func makeSinkExecConfigs(templConfig map[string]*TemplateConfig) []sinkExecConfig {
@@ -103,7 +103,6 @@ func (t templInitErr) Error() string {
 
 func (p *Process) startTickLoops(ctx context.Context, tf tickFunc) error {
 	var wg sync.WaitGroup
-
 	errsChan := make(chan error)
 
 	for i := range p.configs {
@@ -120,7 +119,7 @@ func (p *Process) startTickLoops(ctx context.Context, tf tickFunc) error {
 				p.Logger.Error("init template error", slog.String("error", err.Error()), slog.String("name", sc.name))
 				return
 			}
-			startRenderLoop(ctx, sc, tf, p.Logger)
+			p.startRenderLoop(ctx, sc, tf)
 		}(i)
 	}
 
@@ -156,12 +155,12 @@ func initTemplate(sc *sinkExecConfig) error {
 	return parseTemplate(sc.raw, sc.readFrom, sc.parsed)
 }
 
-func startRenderLoop(ctx context.Context, cfg sinkExecConfig, onTick func(context.Context, sinkExecConfig, render.Sink) error, logger *slog.Logger) {
+func (p *Process) startRenderLoop(ctx context.Context, cfg sinkExecConfig, onTick func(context.Context, sinkExecConfig, render.Sink) error) {
 	ticker := time.NewTicker(cfg.refreshInterval)
 	tick := ticker.C
-
 	defer ticker.Stop()
 
+	p.Logger.Info("starting refresh loop", slog.String("templ", cfg.name))
 	sink := render.Sink{
 		Templ:   cfg.parsed,
 		WriteTo: cfg.dest,
@@ -170,40 +169,48 @@ func startRenderLoop(ctx context.Context, cfg sinkExecConfig, onTick func(contex
 	defer cfg.parsed.CloseActions()
 
 	if cfg.renderOnce {
-		if err := onTick(ctx, cfg, sink); err != nil {
-			logger.Error("renderAndExec error", slog.String("error", err.Error()), slog.String("loop", cfg.name), slog.Bool("once", true))
+		if err := onTick(ctx, cfg, sink); err != nil && !errors.Is(err, render.ContentsIdentical) {
+			p.Logger.Error("renderAndExec error", slog.String("error", err.Error()), slog.String("loop", cfg.name), slog.Bool("once", true))
 		}
 		return
 	}
 
-	// wait for command to complete execution if any
-	failureCount := 0
-	for {
+	retryTimes := 100
+	consecutiveFailures := 0
+	for consecutiveFailures < retryTimes {
 		select {
 		case <-ctx.Done():
-			logger.Info("stopping render sink", slog.String("sink", cfg.name), slog.String("cause", ctx.Err().Error()))
+			p.Logger.Info("stopping render sink", slog.String("sink", cfg.name), slog.String("cause", ctx.Err().Error()))
 			return
 		case <-tick:
 			err := onTick(ctx, cfg, sink)
-			if err != nil {
-				failureCount++
-				logger.Error(
-					"renderAndExec error",
-					slog.String("error", err.Error()),
-					slog.String("loop", cfg.name),
-					slog.Int("consecutive-fail-count", failureCount),
+			switch {
+			case errors.Is(err, render.ContentsIdentical):
+				p.Logger.Info(
+					"render skipped",
+					slog.String("cause", render.ContentsIdentical.Error()),
+					slog.String("templ", cfg.name),
 				)
-				continue
+			case err != nil:
+				consecutiveFailures++
+			default:
+				consecutiveFailures = 0
 			}
-			// reset failure count
-			failureCount = 0
 		}
+	}
+	if consecutiveFailures == retryTimes {
+		p.Logger.Error(
+			"stopping refresh loop",
+			slog.String("templ", cfg.name),
+			slog.String("cause", "too many render failures"),
+		)
 	}
 
 }
 
-func renderAndExec(_ context.Context, cfg sinkExecConfig, sink render.Sink) error {
+func (p *Process) renderAndExec(_ context.Context, cfg sinkExecConfig, sink render.Sink) error {
 	err := sink.Render(cfg.staticData)
+
 	if err != nil {
 		return err
 	}

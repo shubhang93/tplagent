@@ -13,6 +13,8 @@ const tempFileExt = "temp"
 const bakFileExt = "bak"
 const mode = os.FileMode(0766)
 
+var ContentsIdentical = errors.New("identical contents")
+
 type executableTemplate interface {
 	Execute(io.Writer, any) error
 }
@@ -50,7 +52,7 @@ func (s *Sink) Render(staticData any) error {
 	switch {
 	case err == nil:
 		if bytes.Equal(oldFileContents, s.fileContents.Bytes()) {
-			return nil
+			return ContentsIdentical
 		}
 	case errors.Is(err, os.ErrNotExist):
 	default:

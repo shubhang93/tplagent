@@ -110,6 +110,8 @@ func spawn(ctx context.Context, processMaker func(logger *slog.Logger) agentProc
 		logger.Info("agent reloading")
 	}
 
+	logger.Info("starting agent")
+
 	proc := processMaker(logger)
 	err = proc.Start(ctx, config)
 	if err != nil {

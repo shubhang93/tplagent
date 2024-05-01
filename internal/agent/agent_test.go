@@ -161,15 +161,14 @@ func Test_renderLoop(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5000*time.Millisecond)
 			defer cancel()
 
-			logger := newLogger()
-
 			execCount := 0
 			onTick := func(ctx context.Context, config sinkExecConfig, sink render.Sink) error {
 				execCount++
 				return nil
 			}
 
-			startRenderLoop(ctx, ltest.cfg, onTick, logger)
+			p := Process{Logger: newLogger()}
+			p.startRenderLoop(ctx, ltest.cfg, onTick)
 			if ltest.wantCount != execCount {
 				t.Errorf("expected count %d got %d", ltest.wantCount, execCount)
 			}
@@ -272,23 +271,28 @@ func Test_renderLoop(t *testing.T) {
 				args: []string{"hello"},
 			},
 		}}
+		p := Process{
+			Logger:  newLogger(),
+			configs: configs,
+		}
 
 		var mu sync.Mutex
 		loopRunCounts := map[string]int{}
 		tf := tickFunc(func(ctx context.Context, config sinkExecConfig, sink render.Sink) error {
-			if err := renderAndExec(ctx, config, sink); err != nil && !errors.Is(err, context.DeadlineExceeded) {
+			err := p.renderAndExec(ctx, config, sink)
+			switch {
+			case errors.Is(err, context.DeadlineExceeded):
+			case errors.Is(err, render.ContentsIdentical):
+			case err != nil:
 				t.Errorf("renderAndExec failed for %s:%v", config.name, err)
+
 			}
+
 			mu.Lock()
 			loopRunCounts[config.name]++
 			mu.Unlock()
 			return nil
 		})
-
-		p := Process{
-			Logger:  newLogger(),
-			configs: configs,
-		}
 
 		if err := p.startTickLoops(ctx, tf); err != nil {
 			t.Errorf("startTickLoops failed with error:%v", err)
