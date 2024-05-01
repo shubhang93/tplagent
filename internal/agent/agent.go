@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-const defaultExecTimeout = 60 * time.Second
+const defaultExecTimeout = 30 * time.Second
 
 type sinkExecConfig struct {
 	sinkConfig
@@ -176,6 +176,7 @@ func startRenderLoop(ctx context.Context, cfg sinkExecConfig, onTick func(contex
 		return
 	}
 
+	// wait for command to complete execution if any
 	failureCount := 0
 	for {
 		select {
@@ -201,7 +202,7 @@ func startRenderLoop(ctx context.Context, cfg sinkExecConfig, onTick func(contex
 
 }
 
-func renderAndExec(ctx context.Context, cfg sinkExecConfig, sink render.Sink) error {
+func renderAndExec(_ context.Context, cfg sinkExecConfig, sink render.Sink) error {
 	err := sink.Render(cfg.staticData)
 	if err != nil {
 		return err
@@ -211,13 +212,24 @@ func renderAndExec(ctx context.Context, cfg sinkExecConfig, sink render.Sink) er
 		return nil
 	}
 
-	cmdCtx, cancel := context.WithTimeout(ctx, cfg.cmdTimeout)
-	defer cancel()
-	if err := cmdexec.Do(cmdCtx, cfg.cmd, cfg.execConfig.args...); err != nil {
-		return err
-	}
+	errCh := make(chan error, 1)
+	go func() {
+		// use a new context
+		// we want the cmd
+		// to exec within the timeout
+		// and not cancel on the
+		// main context
+		cmdCtx, cancel := context.WithTimeout(context.Background(), cfg.cmdTimeout)
+		defer cancel()
+		if err := cmdexec.Do(cmdCtx, cfg.cmd, cfg.execConfig.args...); err != nil {
+			errCh <- err
+			return
+		}
+		close(errCh)
+		return
+	}()
 
-	return nil
+	return <-errCh
 
 }
 

@@ -10,8 +10,6 @@ import (
 	"github.com/shubhang93/tplagent/internal/agent"
 	"log/slog"
 	"os"
-	"os/exec"
-	"strings"
 	"testing"
 	"time"
 )
@@ -39,8 +37,6 @@ func Test_cli(t *testing.T) {
 	t.Run("start agent test", func(t *testing.T) {
 		configFilePath := tmpDir + "/config.json"
 		dest := tmpDir + "/config.render"
-		cmd := fmt.Sprintf(`bash -c "cat %s"`, dest)
-		t.Log(cmd)
 		ac := agent.Config{Agent: agent.AgentConfig{
 			LogLevel: slog.LevelInfo,
 			LogFmt:   "text",
@@ -57,6 +53,13 @@ Sample Action:{{ sample_greet .name -}}`,
 				StaticData: map[string]string{
 					"name": "Foo",
 				},
+				Exec: &agent.ExecConfig{
+					Cmd: "bash",
+					CmdArgs: []string{
+						"-c",
+						fmt.Sprintf(`echo "%swritten from exec"  >> %s`, "\n", dest),
+					},
+				},
 				RefreshInterval: agent.Duration(1 * time.Second),
 				RenderOnce:      false,
 				MissingKey:      "error",
@@ -64,6 +67,7 @@ Sample Action:{{ sample_greet .name -}}`,
 		}}
 
 		cf, err := os.OpenFile(configFilePath, os.O_CREATE|os.O_RDWR, 0755)
+		defer cf.Close()
 		if err != nil {
 			t.Errorf("error creating file:%v", err)
 			return
@@ -89,14 +93,12 @@ Sample Action:{{ sample_greet .name -}}`,
 		}
 
 		expectedFileContents := `Sample Render:
-Sample Action:Hello Foo`
+Sample Action:Hello Foo
+written from exec
+`
 		if diff := cmp.Diff(expectedFileContents, string(d)); diff != "" {
 			t.Error(diff)
 		}
 
-		cmps := strings.Fields(cmd)
-		comm := cmps[0]
-		op, _ := exec.CommandContext(context.Background(), comm, comm[1:]).Output()
-		t.Log(string(op))
 	})
 }

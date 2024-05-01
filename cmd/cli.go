@@ -34,8 +34,11 @@ var configForGenerate = agent.Config{
 			RefreshInterval: agent.Duration(1 * time.Second),
 			RenderOnce:      false,
 			MissingKey:      "error",
-			ExecCMD:         "echo hello",
-			ExecTimeout:     agent.Duration(10 * time.Second),
+			Exec: &agent.ExecConfig{
+				Cmd:        "echo",
+				CmdArgs:    []string{"hello"},
+				CmdTimeout: agent.Duration(30 * time.Second),
+			},
 		},
 	},
 }
