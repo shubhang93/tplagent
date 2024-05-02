@@ -2,77 +2,42 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"flag"
-	"fmt"
 	"github.com/shubhang93/tplagent/internal/agent"
 	"io"
-	"log/slog"
-	"os"
-	"time"
 )
 
-var configPath string
+const usage = `usage: 
+  tplagent start -config=/path/to/config
+  tplagent generate > path/to/config.json`
+const defaultConfigPath = "/etc/tplagent/config.json"
 
-func init() {
-	flag.StringVar(&configPath, "config", "/etc/tplagent/config.json", "-config=/path/to/config.json")
-}
-
-var configForGenerate = agent.Config{
-	Agent: agent.AgentConfig{
-		LogLevel: slog.LevelInfo,
-		LogFmt:   "text",
-	},
-	TemplateSpecs: map[string]*agent.TemplateConfig{
-		"myapp-config": {
-			Actions:     []agent.ActionsConfig{},
-			Source:      "/path/to/template-file",
-			Destination: "/path/to/outfile",
-			StaticData: map[string]string{
-				"key": "value",
-			},
-			RefreshInterval: agent.Duration(1 * time.Second),
-			RenderOnce:      false,
-			MissingKey:      "error",
-			Exec: &agent.ExecConfig{
-				Cmd:        "echo",
-				CmdArgs:    []string{"hello"},
-				CmdTimeout: agent.Duration(30 * time.Second),
-			},
-		},
-	},
-}
-
-func createCommandHandlers(stdout io.Writer, stderr io.Writer) map[string]func(ctx context.Context) {
-	return map[string]func(context.Context){
-		"start": func(ctx context.Context) {
-			flag.Parse()
-			startAgent(ctx, configPath)
-		},
-		"generate": func(_ context.Context) {
-			jd := json.NewEncoder(stdout)
-			jd.SetIndent("", " ")
-			if err := jd.Encode(configForGenerate); err != nil {
-				_, _ = fmt.Fprint(stderr, "error generating config")
-				os.Exit(1)
-			}
-		},
-	}
-}
-
-var usage = `usage: tplagent <start|generate> -config=/path/to/config`
-
-func runCLI(ctx context.Context, stdout, stderr io.Writer, args ...string) {
+func startCLI(ctx context.Context, stdout io.Writer, args ...string) error {
 	if len(args) < 1 {
-		_, _ = fmt.Fprintln(stderr, usage)
-		os.Exit(1)
+		return errors.New(usage)
 	}
+
+	startCmd := flag.NewFlagSet("start", flag.ExitOnError)
+	configPath := startCmd.String("config", defaultConfigPath, "-config /path/to/config.json")
+
 	cmd := args[0]
-	cfs := createCommandHandlers(stdout, stderr)
-	f, ok := cfs[cmd]
-	if !ok {
-		_, _ = fmt.Fprintln(stderr, usage)
-		os.Exit(1)
+	args = args[1:]
+	switch cmd {
+	case "start":
+		err := startCmd.Parse(args)
+		if err != nil {
+			return err
+		}
+		return startAgent(ctx, *configPath)
+	case "generate":
+		err := agent.GenerateConfig(stdout)
+		if err != nil {
+			return err
+		}
+	default:
+		return errors.New(usage)
 	}
-	f(ctx)
+	return nil
+
 }

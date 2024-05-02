@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/shubhang93/tplagent/internal/agent"
+	"github.com/shubhang93/tplagent/internal/fatal"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -21,32 +22,34 @@ const pidDir = "/tmp/tplagent"
 const pidFilename = "agent.pid"
 
 func main() {
-	args := os.Args[1:]
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
-	runCLI(ctx, os.Stdout, os.Stderr, args...)
-
+	err := startCLI(ctx, os.Stdout, os.Args[1:]...)
+	if notCtxErr(err) {
+		_, _ = fmt.Fprint(os.Stderr, err.Error())
+		os.Exit(1)
+	}
 }
 
-func startAgent(ctx context.Context, configFilePath string) {
+func startAgent(ctx context.Context, configFilePath string) error {
 	pid := os.Getpid()
 	writePID(pid)
 	defer func() {
-		_ = os.Remove(pidDir)
+		_ = os.RemoveAll(pidDir)
 	}()
 
 	processMaker := func(l *slog.Logger) agentProcess {
 		return &agent.Process{Logger: l}
 	}
+	return spawnAndReload(ctx, processMaker, configFilePath)
 
-	spawnAndReload(ctx, processMaker, configFilePath)
 }
 
 type agentProcess interface {
 	Start(context.Context, agent.Config) error
 }
 
-func spawnAndReload(rootCtx context.Context, processMaker func(logger *slog.Logger) agentProcess, configPath string) {
+func spawnAndReload(rootCtx context.Context, processMaker func(logger *slog.Logger) agentProcess, configPath string) error {
 	ctx, cancel := context.WithCancelCause(rootCtx)
 	sighup := make(chan os.Signal, 1)
 	signal.Notify(sighup, syscall.SIGHUP)
@@ -58,15 +61,15 @@ func spawnAndReload(rootCtx context.Context, processMaker func(logger *slog.Logg
 		spawnErrChan <- err
 	}()
 
+	var spawnErr error
 	run := true
 	for run {
 		select {
 		case <-sighup:
 			cancel(sighupReceived)
-
 			err := <-spawnErrChan
-			if isFatal(err) {
-				_, _ = fmt.Fprintf(os.Stderr, "spawn error:%s\n", err.Error())
+			if fatal.Is(err) {
+				spawnErr = err
 				run = false
 				break
 			}
@@ -77,15 +80,15 @@ func spawnAndReload(rootCtx context.Context, processMaker func(logger *slog.Logg
 				spawnErrChan <- err
 			}()
 		case err := <-spawnErrChan:
-			if isFatal(err) {
-				_, _ = fmt.Fprintf(os.Stderr, "spawn error:%s\n", err.Error())
+			if fatal.Is(err) {
+				spawnErr = err
 				run = false
 				cancel(err)
 			}
 		case <-ctx.Done():
 			err := <-spawnErrChan
 			if err != nil {
-				_, _ = fmt.Fprintf(os.Stderr, "spawn error:%s\n", err.Error())
+				spawnErr = err
 			}
 			cancel(ctx.Err())
 			// acquiring sem ensures that
@@ -94,6 +97,7 @@ func spawnAndReload(rootCtx context.Context, processMaker func(logger *slog.Logg
 			run = false
 		}
 	}
+	return spawnErr
 }
 
 func spawn(ctx context.Context, processMaker func(logger *slog.Logger) agentProcess, confPath string, isReload bool) error {
@@ -150,7 +154,6 @@ func writePID(pid int) {
 	_ = os.WriteFile(fullPath, bs, 0755)
 }
 
-func isFatal(err error) bool {
-	errFatal, ok := err.(interface{ Fatal() bool })
-	return ok && errFatal.Fatal()
+func notCtxErr(err error) bool {
+	return err != nil && !errors.Is(err, context.DeadlineExceeded) || !errors.Is(err, context.Canceled)
 }

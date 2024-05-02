@@ -37,7 +37,8 @@ func Test_readConfig(t *testing.T) {
 		configJSON := `{
   "agent": {
     "log_level": "ERROR",
-    "log_fmt": "json"
+    "log_fmt": "json",
+	"max_consecutive_failures": 25
   },
   "templates": {
     "test-config": {
@@ -76,8 +77,9 @@ func Test_readConfig(t *testing.T) {
 `
 		expectedConfig := Config{
 			Agent: AgentConfig{
-				LogLevel: slog.LevelError,
-				LogFmt:   "json",
+				LogLevel:               slog.LevelError,
+				LogFmt:                 "json",
+				MaxConsecutiveFailures: 25,
 			},
 			TemplateSpecs: map[string]*TemplateConfig{
 				"test-config": {

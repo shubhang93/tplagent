@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/google/go-cmp/cmp"
 	"github.com/shubhang93/tplagent/internal/agent"
+	"github.com/shubhang93/tplagent/internal/fatal"
 	"log/slog"
 	"os"
 	"testing"
@@ -19,11 +20,11 @@ func Test_cli(t *testing.T) {
 	t.Run("test generate", func(t *testing.T) {
 		stdout := bytes.Buffer{}
 		expected := bytes.Buffer{}
-		runCLI(context.Background(), &stdout, os.Stderr, "generate")
+		_ = startCLI(context.Background(), &stdout, "generate")
 
 		jd := json.NewEncoder(&expected)
 		jd.SetIndent("", " ")
-		if err := jd.Encode(configForGenerate); err != nil {
+		if err := jd.Encode(agent.StarterConfig); err != nil {
 			t.Errorf("error encoding:%v", err)
 			return
 		}
@@ -84,7 +85,11 @@ Sample Action:{{ sample_greet .name -}}`,
 		defer cancel()
 
 		_ = flag.Set("config", configFilePath)
-		runCLI(ctx, os.Stdout, os.Stderr, "start")
+		err = startCLI(ctx, os.Stdout, "start", "-config", configFilePath)
+		if fatal.Is(err) {
+			t.Errorf("CLI error:%v", err)
+			return
+		}
 
 		d, err := os.ReadFile(dest)
 		if err != nil {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/shubhang93/tplagent/internal/actionable"
+	"github.com/shubhang93/tplagent/internal/fatal"
 	"github.com/shubhang93/tplagent/internal/render"
 	"log/slog"
 	"os"
@@ -167,8 +168,11 @@ func Test_renderLoop(t *testing.T) {
 				return nil
 			}
 
-			p := Process{Logger: newLogger()}
-			p.startRenderLoop(ctx, ltest.cfg, onTick)
+			p := Process{Logger: newLogger(), maxConsecFailures: 10}
+			err := p.startRenderLoop(ctx, ltest.cfg, onTick)
+			if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+				t.Errorf("%v", err)
+			}
 			if ltest.wantCount != execCount {
 				t.Errorf("expected count %d got %d", ltest.wantCount, execCount)
 			}
@@ -272,8 +276,9 @@ func Test_renderLoop(t *testing.T) {
 			},
 		}}
 		p := Process{
-			Logger:  newLogger(),
-			configs: configs,
+			Logger:            newLogger(),
+			configs:           configs,
+			maxConsecFailures: 10,
 		}
 
 		var mu sync.Mutex
@@ -294,7 +299,7 @@ func Test_renderLoop(t *testing.T) {
 			return nil
 		})
 
-		if err := p.startTickLoops(ctx, tf); err != nil {
+		if err := p.startTickLoops(ctx, tf); fatal.Is(err) {
 			t.Errorf("startTickLoops failed with error:%v", err)
 		}
 		for name, lrc := range loopRunCounts {

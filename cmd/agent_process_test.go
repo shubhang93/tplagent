@@ -99,7 +99,7 @@ func Test_spawnAndReload(t *testing.T) {
 			return ma
 		}
 
-		spawnAndReload(ctx, processMaker, cfgFileLocation)
+		_ = spawnAndReload(ctx, processMaker, cfgFileLocation)
 
 		expectedConfigs := append([]agent.Config{oldConfig}, newConfigs...)
 
@@ -151,7 +151,7 @@ func Test_spawnAndReload(t *testing.T) {
 		pm := func(l *slog.Logger) agentProcess {
 			return ma
 		}
-		spawnAndReload(ctx, pm, cfgFileLocation)
+		_ = spawnAndReload(ctx, pm, cfgFileLocation)
 	})
 
 }

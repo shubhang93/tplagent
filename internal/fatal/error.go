@@ -15,3 +15,8 @@ func NewError(err error) error {
 func (e Error) Fatal() bool {
 	return true
 }
+
+func Is(err error) bool {
+	fe, ok := err.(interface{ Fatal() bool })
+	return ok && fe.Fatal()
+}

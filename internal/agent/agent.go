@@ -17,11 +17,14 @@ import (
 )
 
 const defaultExecTimeout = 30 * time.Second
+const defaultMaxConsecFailures = 10
 
 type sinkExecConfig struct {
 	sinkConfig
 	*execConfig
 }
+
+var errTooManyFailures = errors.New("too many failures")
 
 type tickFunc func(ctx context.Context, config sinkExecConfig, sink render.Sink) error
 
@@ -47,14 +50,16 @@ type execConfig struct {
 }
 
 type Process struct {
-	Logger  *slog.Logger
-	configs []sinkExecConfig
+	Logger            *slog.Logger
+	configs           []sinkExecConfig
+	maxConsecFailures int
 }
 
 func (p *Process) Start(ctx context.Context, config Config) error {
 	templConfig := config.TemplateSpecs
 	scs := makeSinkExecConfigs(templConfig)
 	p.configs = scs
+	p.maxConsecFailures = cmp.Or(config.Agent.MaxConsecutiveFailures, defaultMaxConsecFailures)
 	return p.startTickLoops(ctx, p.renderAndExec)
 }
 
@@ -115,11 +120,11 @@ func (p *Process) startTickLoops(ctx context.Context, tf tickFunc) error {
 					name: sc.name,
 					err:  err,
 				}
-				errsChan <- initErr
+				errsChan <- fatal.NewError(initErr)
 				p.Logger.Error("init template error", slog.String("error", err.Error()), slog.String("name", sc.name))
 				return
 			}
-			p.startRenderLoop(ctx, sc, tf)
+			errsChan <- p.startRenderLoop(ctx, sc, tf)
 		}(i)
 	}
 
@@ -128,20 +133,24 @@ func (p *Process) startTickLoops(ctx context.Context, tf tickFunc) error {
 		close(errsChan)
 	}()
 
-	var initErrs []error
+	var loopErrs []error
+	var fatalCount int
 	for err := range errsChan {
-		initErrs = append(initErrs, err)
+		if fatal.Is(err) {
+			fatalCount++
+		}
+		loopErrs = append(loopErrs, err)
 	}
 
-	if len(initErrs) < 1 {
+	if len(loopErrs) < 1 {
 		return nil
 	}
 
-	if len(initErrs) == len(p.configs) {
-		return fatal.NewError(errors.Join(initErrs...))
+	if fatalCount == len(p.configs) {
+		return fatal.NewError(errors.Join(loopErrs...))
 	}
 
-	return errors.Join(initErrs...)
+	return errors.Join(loopErrs...)
 }
 
 func initTemplate(sc *sinkExecConfig) error {
@@ -155,7 +164,7 @@ func initTemplate(sc *sinkExecConfig) error {
 	return parseTemplate(sc.raw, sc.readFrom, sc.parsed)
 }
 
-func (p *Process) startRenderLoop(ctx context.Context, cfg sinkExecConfig, onTick func(context.Context, sinkExecConfig, render.Sink) error) {
+func (p *Process) startRenderLoop(ctx context.Context, cfg sinkExecConfig, onTick func(context.Context, sinkExecConfig, render.Sink) error) error {
 	ticker := time.NewTicker(cfg.refreshInterval)
 	tick := ticker.C
 	defer ticker.Stop()
@@ -172,16 +181,15 @@ func (p *Process) startRenderLoop(ctx context.Context, cfg sinkExecConfig, onTic
 		if err := onTick(ctx, cfg, sink); err != nil && !errors.Is(err, render.ContentsIdentical) {
 			p.Logger.Error("renderAndExec error", slog.String("error", err.Error()), slog.String("loop", cfg.name), slog.Bool("once", true))
 		}
-		return
+		return nil
 	}
 
-	retryTimes := 100
 	consecutiveFailures := 0
-	for consecutiveFailures < retryTimes {
+	for consecutiveFailures < p.maxConsecFailures {
 		select {
 		case <-ctx.Done():
 			p.Logger.Info("stopping render sink", slog.String("sink", cfg.name), slog.String("cause", ctx.Err().Error()))
-			return
+			return ctx.Err()
 		case <-tick:
 			err := onTick(ctx, cfg, sink)
 			switch {
@@ -198,14 +206,15 @@ func (p *Process) startRenderLoop(ctx context.Context, cfg sinkExecConfig, onTic
 			}
 		}
 	}
-	if consecutiveFailures == retryTimes {
+	if consecutiveFailures == p.maxConsecFailures {
 		p.Logger.Error(
 			"stopping refresh loop",
 			slog.String("templ", cfg.name),
 			slog.String("cause", "too many render failures"),
 		)
+		return fatal.NewError(errTooManyFailures)
 	}
-
+	return nil
 }
 
 func (p *Process) renderAndExec(_ context.Context, cfg sinkExecConfig, sink render.Sink) error {

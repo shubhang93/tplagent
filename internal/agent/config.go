@@ -18,14 +18,14 @@ var allowedLogFmts = map[string]struct{}{
 }
 
 type AgentConfig struct {
-	LogLevel slog.Level `json:"log_level"`
-	LogFmt   string     `json:"log_fmt"`
+	LogLevel               slog.Level `json:"log_level"`
+	LogFmt                 string     `json:"log_fmt"`
+	MaxConsecutiveFailures int        `json:"max_consecutive_failures"`
 }
 
 type Duration time.Duration
 
 func (r *Duration) MarshalJSON() ([]byte, error) {
-
 	bs := []byte{'"'}
 	bs = append(bs)
 	bs = append(bs, time.Duration(*r).String()...)
