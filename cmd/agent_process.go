@@ -25,8 +25,8 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 	err := startCLI(ctx, os.Stdout, os.Args[1:]...)
-	if err != nil && notCtxErr(err) {
-		_, _ = fmt.Fprint(os.Stderr, err.Error())
+	if err != nil && !isCtxErr(err) {
+		_, _ = fmt.Fprintf(os.Stderr, "cmd failed with:%s", err.Error())
 		os.Exit(1)
 	}
 }
@@ -154,6 +154,6 @@ func writePID(pid int) {
 	_ = os.WriteFile(fullPath, bs, 0755)
 }
 
-func notCtxErr(err error) bool {
-	return !errors.Is(err, context.DeadlineExceeded) || !errors.Is(err, context.Canceled)
+func isCtxErr(err error) bool {
+	return errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)
 }

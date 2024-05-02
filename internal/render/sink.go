@@ -38,12 +38,6 @@ func (s *Sink) Render(staticData any) error {
 		return err
 	}
 
-	tempFileName := fmt.Sprintf("%s.%s", s.WriteTo, tempFileExt)
-	tempFile, err := createWritableFile(tempFileName)
-	if err != nil {
-		return err
-	}
-
 	s.fileContents.Reset()
 	if err := renderTempl(s.Templ, s.fileContents, staticData); err != nil {
 		return err
@@ -72,23 +66,27 @@ func (s *Sink) Render(staticData any) error {
 		if err != nil {
 			return fmt.Errorf("failed to backup file:%w", err)
 		}
-
-		if err := writeTempFile(tempFile, s.fileContents, s.copyBuffer); err != nil {
-			return fmt.Errorf("error writing to temp file:%w", err)
-		}
-
-		if err := os.Rename(tempFile.Name(), s.WriteTo); err != nil {
-			return fmt.Errorf("error renaming file:%w", err)
-		}
+		return atomicWrite(s.WriteTo, s.fileContents, s.copyBuffer)
 	case errors.Is(err, os.ErrNotExist):
-		if err := writeTempFile(tempFile, s.fileContents, s.copyBuffer); err != nil {
-			return fmt.Errorf("error writing to temp file:%w", err)
-		}
-		if err := os.Rename(tempFile.Name(), s.WriteTo); err != nil {
-			return fmt.Errorf("error renaming file:%w", err)
-		}
+		return atomicWrite(s.WriteTo, s.fileContents, s.copyBuffer)
 	default:
 		return err
+	}
+}
+
+func atomicWrite(dest string, contents io.Reader, copyBuff []byte) error {
+	tempFileName := fmt.Sprintf("%s.%s", dest, tempFileExt)
+	tempFile, err := createWritableFile(tempFileName)
+	if err != nil {
+		return err
+	}
+
+	clear(copyBuff)
+	if err := writeTempFile(tempFile, contents, copyBuff); err != nil {
+		return fmt.Errorf("error writing to temp file:%w", err)
+	}
+	if err := os.Rename(tempFile.Name(), dest); err != nil {
+		return fmt.Errorf("error renaming file:%w", err)
 	}
 	return nil
 }
@@ -102,7 +100,7 @@ func makeBackup(bakFile *os.File, oldFile *os.File, buff []byte) error {
 	return nil
 }
 
-func writeTempFile(tempFile *os.File, contents *bytes.Buffer, buff []byte) error {
+func writeTempFile(tempFile *os.File, contents io.Reader, buff []byte) error {
 	clear(buff)
 	if _, err := io.CopyBuffer(tempFile, contents, buff); err != nil {
 		return err

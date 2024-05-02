@@ -194,14 +194,12 @@ func (p *Process) startRenderLoop(ctx context.Context, cfg sinkExecConfig, onTic
 			err := onTick(ctx, cfg, sink)
 			switch {
 			case errors.Is(err, render.ContentsIdentical):
-				p.Logger.Info(
-					"render skipped",
-					slog.String("cause", render.ContentsIdentical.Error()),
-					slog.String("templ", cfg.name),
-				)
+				consecutiveFailures = 0
 			case err != nil:
+				p.Logger.Error("refresh failed", slog.String("cause", err.Error()))
 				consecutiveFailures++
 			default:
+				p.Logger.Info("refresh complete", slog.String("tmpl", cfg.name))
 				consecutiveFailures = 0
 			}
 		}
