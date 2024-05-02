@@ -25,7 +25,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer cancel()
 	err := startCLI(ctx, os.Stdout, os.Args[1:]...)
-	if notCtxErr(err) {
+	if err != nil && notCtxErr(err) {
 		_, _ = fmt.Fprint(os.Stderr, err.Error())
 		os.Exit(1)
 	}
@@ -35,7 +35,7 @@ func startAgent(ctx context.Context, configFilePath string) error {
 	pid := os.Getpid()
 	writePID(pid)
 	defer func() {
-		_ = os.RemoveAll(pidDir)
+		_ = os.Remove(fmt.Sprintf("%s/%s", pidDir, pidFilename))
 	}()
 
 	processMaker := func(l *slog.Logger) agentProcess {
@@ -155,5 +155,5 @@ func writePID(pid int) {
 }
 
 func notCtxErr(err error) bool {
-	return err != nil && !errors.Is(err, context.DeadlineExceeded) || !errors.Is(err, context.Canceled)
+	return !errors.Is(err, context.DeadlineExceeded) || !errors.Is(err, context.Canceled)
 }
