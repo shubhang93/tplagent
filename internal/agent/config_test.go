@@ -3,6 +3,7 @@ package agent
 import (
 	"encoding/json"
 	"github.com/google/go-cmp/cmp"
+	"github.com/shubhang93/tplagent/internal/duration"
 	"log/slog"
 	"strings"
 	"testing"
@@ -83,7 +84,7 @@ func Test_readConfig(t *testing.T) {
 			},
 			TemplateSpecs: map[string]*TemplateConfig{
 				"test-config": {
-					RefreshInterval: Duration(10 * time.Second),
+					RefreshInterval: duration.Duration(10 * time.Second),
 					//ExecCMD:         `echo "rendererd"`,
 					Exec: &ExecConfig{
 						Cmd:     "echo",
@@ -101,7 +102,7 @@ func Test_readConfig(t *testing.T) {
 					},
 				},
 				"test-config2": {
-					RefreshInterval: Duration(5 * time.Second),
+					RefreshInterval: duration.Duration(5 * time.Second),
 					Exec: &ExecConfig{
 						Cmd:     "echo",
 						CmdArgs: []string{"rendered"},
@@ -130,11 +131,11 @@ func Test_readConfig(t *testing.T) {
 			},
 			TemplateSpecs: map[string]*TemplateConfig{
 				"templ-conf": {
-					RefreshInterval: Duration(500 * time.Millisecond),
+					RefreshInterval: duration.Duration(500 * time.Millisecond),
 					Actions:         []ActionsConfig{{}},
 				},
 				"templ-conf2": {
-					RefreshInterval: Duration(1 * time.Second),
+					RefreshInterval: duration.Duration(1 * time.Second),
 					Source:          "/tmpl/parsed.tmpl",
 					Destination:     "/tmpl/dest",
 				},

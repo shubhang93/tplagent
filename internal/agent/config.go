@@ -1,10 +1,10 @@
 package agent
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/shubhang93/tplagent/internal/duration"
 	"github.com/shubhang93/tplagent/internal/fatal"
 	"io"
 	"log/slog"
@@ -23,50 +23,30 @@ type AgentConfig struct {
 	MaxConsecutiveFailures int        `json:"max_consecutive_failures"`
 }
 
-type Duration time.Duration
-
-func (r *Duration) MarshalJSON() ([]byte, error) {
-	bs := []byte{'"'}
-	bs = append(bs)
-	bs = append(bs, time.Duration(*r).String()...)
-	bs = append(bs, '"')
-	return bs, nil
-}
-
-func (r *Duration) UnmarshalJSON(bs []byte) error {
-	bs = bytes.Trim(bs, `"`)
-	dur, err := time.ParseDuration(string(bs))
-	if err != nil {
-		return fmt.Errorf("invalid duration string:%w", err)
-	}
-	*r = Duration(dur)
-	return nil
-}
-
 type ActionsConfig struct {
 	Name   string          `json:"name"`
 	Config json.RawMessage `json:"config"`
 }
 
 type ExecConfig struct {
-	Cmd        string   `json:"cmd"`
-	CmdArgs    []string `json:"cmd_args"`
-	CmdTimeout Duration `json:"cmd_timeout"`
+	Cmd        string            `json:"cmd"`
+	CmdArgs    []string          `json:"cmd_args"`
+	CmdTimeout duration.Duration `json:"cmd_timeout"`
 }
 
 type TemplateConfig struct {
 	// required for
 	// creation of template
-	Actions            []ActionsConfig `json:"actions,omitempty"`
-	TemplateDelimiters []string        `json:"template_delimiters,omitempty"`
-	Source             string          `json:"source,omitempty"`
-	Raw                string          `json:"raw,omitempty"`
-	Destination        string          `json:"destination,omitempty"`
-	HTML               bool            `json:"html"`
-	StaticData         any             `json:"static_data,omitempty"`
-	RefreshInterval    Duration        `json:"refresh_interval,omitempty"`
-	RenderOnce         bool            `json:"render_once,omitempty"`
-	MissingKey         string          `json:"missing_key"`
+	Actions            []ActionsConfig   `json:"actions,omitempty"`
+	TemplateDelimiters []string          `json:"template_delimiters,omitempty"`
+	Source             string            `json:"source,omitempty"`
+	Raw                string            `json:"raw,omitempty"`
+	Destination        string            `json:"destination,omitempty"`
+	HTML               bool              `json:"html"`
+	StaticData         any               `json:"static_data,omitempty"`
+	RefreshInterval    duration.Duration `json:"refresh_interval,omitempty"`
+	RenderOnce         bool              `json:"render_once,omitempty"`
+	MissingKey         string            `json:"missing_key"`
 
 	Exec *ExecConfig `json:"exec"`
 }
@@ -108,7 +88,7 @@ func validateConfig(c *Config) error {
 		}
 
 		refrInterval := tmplConfig.RefreshInterval
-		if refrInterval > 0 && refrInterval < Duration(1*time.Second) {
+		if refrInterval > 0 && refrInterval < duration.Duration(1*time.Second) {
 			refrIntErr := fmt.Errorf("validate:refresh interval should be >= 1s tmpl name:%s", tmplName)
 			valErrs = append(valErrs, refrIntErr)
 		}

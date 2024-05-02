@@ -2,6 +2,7 @@ package agent
 
 import (
 	"encoding/json"
+	"github.com/shubhang93/tplagent/internal/duration"
 	"io"
 	"log/slog"
 	"time"
@@ -30,13 +31,13 @@ var StarterConfig = Config{
 			StaticData: map[string]string{
 				"key": "value",
 			},
-			RefreshInterval: Duration(1 * time.Second),
+			RefreshInterval: duration.Duration(1 * time.Second),
 			RenderOnce:      false,
 			MissingKey:      "error",
 			Exec: &ExecConfig{
 				Cmd:        "echo",
 				CmdArgs:    []string{"hello"},
-				CmdTimeout: Duration(30 * time.Second),
+				CmdTimeout: duration.Duration(30 * time.Second),
 			},
 		},
 	},

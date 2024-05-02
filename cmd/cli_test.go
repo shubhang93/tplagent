@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/google/go-cmp/cmp"
 	"github.com/shubhang93/tplagent/internal/agent"
+	"github.com/shubhang93/tplagent/internal/duration"
 	"github.com/shubhang93/tplagent/internal/fatal"
 	"log/slog"
 	"os"
@@ -61,7 +62,7 @@ Sample Action:{{ sample_greet .name -}}`,
 						fmt.Sprintf(`echo "%swritten from exec"  >> %s`, "\n", dest),
 					},
 				},
-				RefreshInterval: agent.Duration(1 * time.Second),
+				RefreshInterval: duration.Duration(1 * time.Second),
 				RenderOnce:      false,
 				MissingKey:      "error",
 			},

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/shubhang93/tplagent/internal/actionable"
+	"github.com/shubhang93/tplagent/internal/duration"
 	"github.com/shubhang93/tplagent/internal/fatal"
 	"github.com/shubhang93/tplagent/internal/render"
 	"log/slog"
@@ -31,12 +32,12 @@ func Test_makeSinkExecConfigs(t *testing.T) {
 				Destination:     "${HOME}/testdir2",
 				HTML:            false,
 				StaticData:      map[string]any{},
-				RefreshInterval: Duration(1 * time.Second),
+				RefreshInterval: duration.Duration(1 * time.Second),
 				RenderOnce:      true,
 				Exec: &ExecConfig{
 					Cmd:        "echo",
 					CmdArgs:    []string{"hello"},
-					CmdTimeout: Duration(5 * time.Second),
+					CmdTimeout: duration.Duration(5 * time.Second),
 				},
 			},
 			"testconfig2": {

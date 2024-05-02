@@ -45,7 +45,7 @@ func (s *Sink) Render(staticData any) error {
 	oldFileContents, err := os.ReadFile(s.WriteTo)
 	switch {
 	case err == nil:
-		if bytes.Equal(oldFileContents, s.fileContents.Bytes()) {
+		if res := bytes.Compare(oldFileContents, s.fileContents.Bytes()); res == 0 {
 			return ContentsIdentical
 		}
 	case errors.Is(err, os.ErrNotExist):
