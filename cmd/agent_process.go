@@ -142,7 +142,3 @@ func writePID(pid int) {
 	bs := []byte(strconv.Itoa(pid))
 	_ = os.WriteFile(fullPath, bs, 0755)
 }
-
-func isCtxErr(err error) bool {
-	return errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)
-}

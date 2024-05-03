@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -13,7 +14,11 @@ func main() {
 	defer cancel()
 	err := startCLI(ctx, os.Stdout, os.Args[1:]...)
 	if err != nil && !isCtxErr(err) {
-		_, _ = fmt.Fprintf(os.Stderr, "cmd failed with:%s", err.Error())
+		_, _ = fmt.Fprintf(os.Stderr, err.Error())
 		os.Exit(1)
 	}
+}
+
+func isCtxErr(err error) bool {
+	return errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)
 }

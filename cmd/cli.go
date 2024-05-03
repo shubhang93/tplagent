@@ -9,8 +9,14 @@ import (
 )
 
 const usage = `usage: 
-  tplagent start -config=/path/to/config
-  tplagent generate > path/to/config.json`
+  tplagent start -config=/path/to/config.json
+   args:
+    config: specifies the path to read the config file from ( default /etc/tplagent/config.json )
+  tplagent genconf -n 1 > path/to/config.json
+   args:
+    n: number of template blocks to generate (default 1)
+`
+
 const defaultConfigPath = "/etc/tplagent/config.json"
 
 func startCLI(ctx context.Context, stdout io.Writer, args ...string) error {
