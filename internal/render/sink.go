@@ -42,36 +42,33 @@ func (s *Sink) Render(staticData any) error {
 	if err := renderTempl(s.Templ, s.fileContents, staticData); err != nil {
 		return err
 	}
-	oldFileContents, err := os.ReadFile(s.WriteTo)
+
+	oldFileContents, readErr := os.ReadFile(s.WriteTo)
 	switch {
-	case err == nil:
+	case readErr == nil:
 		if res := bytes.Compare(oldFileContents, s.fileContents.Bytes()); res == 0 {
 			return ContentsIdentical
 		}
-	case errors.Is(err, os.ErrNotExist):
+
+		bakFile := fmt.Sprintf("%s.bak", s.WriteTo)
+		if err := os.WriteFile(bakFile, oldFileContents, mode); err != nil {
+			return fmt.Errorf("failed to create backup:%w", err)
+		}
+
+		if err := atomicWrite(s.WriteTo, s.fileContents, s.copyBuffer); err != nil {
+			return fmt.Errorf("atomic write failed:%w", err)
+		}
+
+	case errors.Is(readErr, os.ErrNotExist):
+		if err := atomicWrite(s.WriteTo, s.fileContents, s.copyBuffer); err != nil {
+			return fmt.Errorf("atomic write failed:%w", err)
+		}
 	default:
-		return fmt.Errorf("error reading old file contents:%w", err)
+		return readErr
+
 	}
 
-	oldFile, err := os.Open(s.WriteTo)
-
-	switch {
-	case err == nil:
-		bakFileName := fmt.Sprintf("%s.%s", s.WriteTo, bakFileExt)
-		bakFile, err := createWritableFile(bakFileName)
-		if err != nil {
-			return err
-		}
-		err = makeBackup(bakFile, oldFile, s.copyBuffer)
-		if err != nil {
-			return fmt.Errorf("failed to backup file:%w", err)
-		}
-		return atomicWrite(s.WriteTo, s.fileContents, s.copyBuffer)
-	case errors.Is(err, os.ErrNotExist):
-		return atomicWrite(s.WriteTo, s.fileContents, s.copyBuffer)
-	default:
-		return err
-	}
+	return nil
 }
 
 func atomicWrite(dest string, contents io.Reader, copyBuff []byte) error {
@@ -86,16 +83,8 @@ func atomicWrite(dest string, contents io.Reader, copyBuff []byte) error {
 		return fmt.Errorf("error writing to temp file:%w", err)
 	}
 	if err := os.Rename(tempFile.Name(), dest); err != nil {
+		_ = os.Remove(tempFileName)
 		return fmt.Errorf("error renaming file:%w", err)
-	}
-	return nil
-}
-
-func makeBackup(bakFile *os.File, oldFile *os.File, buff []byte) error {
-	clear(buff)
-	_, err := io.CopyBuffer(bakFile, oldFile, buff)
-	if err != nil {
-		return err
 	}
 	return nil
 }
@@ -132,7 +121,7 @@ func ensureDestDirs(filename string) error {
 }
 
 func createWritableFile(filename string) (*os.File, error) {
-	fi, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, mode)
+	fi, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, mode)
 	if err != nil {
 		return nil, err
 	}
