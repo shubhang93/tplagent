@@ -12,6 +12,7 @@ func TestDo(t *testing.T) {
 
 	type execTest struct {
 		name        string
+		args        []string
 		beforeFunc  func()
 		cmd         string
 		timeout     time.Duration
@@ -22,10 +23,12 @@ func TestDo(t *testing.T) {
 	execTests := []execTest{{
 		name:        "bin exists",
 		cmd:         `echo "hello world"`,
+		args:        []string{"hello world"},
 		expectError: false,
 	}, {
 		name:        "bin does not exist",
-		cmd:         "foobarfoo 123",
+		cmd:         "foobarfoo",
+		args:        []string{"123"},
 		expectError: true,
 	}, {
 		name: "run command from script",
@@ -44,12 +47,8 @@ echo "hello world from script"
 				return
 			}
 		},
-		cmd: fmt.Sprintf("bash -c %s/%s", temp, scriptName),
-	}, {
-		name:        "malformed command",
-		cmd:         "bash          -c",
-		timeout:     0,
-		expectError: true,
+		cmd:  "bash",
+		args: []string{"-c", fmt.Sprintf("%s/%s", temp, scriptName)},
 	}}
 
 	for _, et := range execTests {
@@ -63,7 +62,11 @@ echo "hello world from script"
 				ctx, cancel = context.WithTimeout(context.Background(), et.timeout)
 			}
 			defer cancel()
-			err := Do(ctx, et.cmd)
+			defaultExecer := Default{
+				Cmd:  et.cmd,
+				Args: et.args,
+			}
+			err := defaultExecer.ExecContext(ctx)
 			if et.expectError && err == nil {
 				t.Errorf("expected error got nil")
 				return

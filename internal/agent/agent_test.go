@@ -7,6 +7,7 @@ import (
 	"fmt"
 	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/shubhang93/tplagent/internal/actionable"
+	"github.com/shubhang93/tplagent/internal/cmdexec"
 	"github.com/shubhang93/tplagent/internal/duration"
 	"github.com/shubhang93/tplagent/internal/fatal"
 	"github.com/shubhang93/tplagent/internal/render"
@@ -68,9 +69,12 @@ func Test_makeSinkExecConfigs(t *testing.T) {
 					readFrom:        homeDir + "/testdir",
 				},
 				execConfig: &execConfig{
-					cmd:        "echo",
-					args:       []string{"hello"},
 					cmdTimeout: 5 * time.Second,
+					command: &cmdexec.Default{
+						Args: []string{"hello"},
+						Cmd:  "echo",
+						Env:  nil,
+					},
 				},
 			},
 			{
@@ -86,8 +90,10 @@ func Test_makeSinkExecConfigs(t *testing.T) {
 					renderOnce: true,
 				},
 				execConfig: &execConfig{
-					cmd:        "echo",
-					args:       []string{"hello"},
+					command: &cmdexec.Default{
+						Args: []string{"hello"},
+						Cmd:  "echo",
+					},
 					cmdTimeout: 30 * time.Second,
 				},
 			}}
@@ -133,8 +139,10 @@ func Test_renderLoop(t *testing.T) {
 				name:            "test-tmpl",
 			},
 			execConfig: &execConfig{
-				cmd:        `echo`,
-				args:       []string{"hello"},
+				command: &cmdexec.Default{
+					Args: []string{"hello"},
+					Cmd:  "echo",
+				},
 				cmdTimeout: 30 * time.Second,
 			},
 		},
@@ -151,8 +159,11 @@ func Test_renderLoop(t *testing.T) {
 				name:            "test-tmpl",
 			},
 			execConfig: &execConfig{
-				cmd:        `echo`,
-				args:       []string{"hello"},
+				command: &cmdexec.Default{
+					Cmd:  `echo`,
+					Args: []string{"hello"},
+					Env:  nil,
+				},
 				cmdTimeout: 30 * time.Second,
 			},
 		},
@@ -194,6 +205,40 @@ func Test_renderLoop(t *testing.T) {
 		})
 		if !errors.Is(err, errTooManyFailures) {
 			t.Errorf("expected: %v got: %v", errTooManyFailures, err)
+		}
+	})
+
+	t.Run("reset consec failures reset", func(t *testing.T) {
+		proc := Process{
+			Logger:            newLogger(),
+			maxConsecFailures: 4,
+		}
+		cfg := sinkExecConfig{
+			sinkConfig: sinkConfig{
+				name:            "test",
+				parsed:          actionable.NewTemplate("test", false),
+				refreshInterval: 1 * time.Second,
+			},
+		}
+
+		n := time.Duration(6)
+		ctx, cancel := context.WithTimeout(context.Background(), n*time.Second)
+		defer cancel()
+
+		tickCount := 0
+		err := proc.startRenderLoop(ctx, cfg, func(ctx context.Context, config sinkExecConfig, sink render.Sink) error {
+			tickCount++
+			switch tickCount {
+			case 1, 2, 3:
+				return errors.New("error occurred")
+			}
+			return render.ContentsIdentical
+		})
+		if errors.Is(err, errTooManyFailures) {
+			t.Error(err)
+		}
+		if tickCount != int(n) {
+			t.Errorf("expected tick count %d got %d", int(n), tickCount)
 		}
 	})
 
@@ -293,8 +338,10 @@ func Test_renderLoop(t *testing.T) {
 				readFrom:        src2,
 			},
 			execConfig: &execConfig{
-				cmd:  `echo`,
-				args: []string{"hello"},
+				command: &cmdexec.Default{
+					Cmd:  `echo`,
+					Args: []string{"hello"},
+				},
 			},
 		}}
 		p := Process{

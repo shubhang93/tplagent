@@ -7,18 +7,26 @@ import (
 	"os/exec"
 )
 
-func Do(ctx context.Context, cmd string, args ...string) error {
+type Default struct {
+	Args []string
+	Cmd  string
+	Env  map[string]string
+}
 
-	cmdPath, err := exec.LookPath(cmd)
+func (d *Default) ExecContext(ctx context.Context) error {
+
+	cmdPath, err := exec.LookPath(d.Cmd)
 	if errors.Is(err, exec.ErrNotFound) {
 		return err
 	}
 
-	runErr := exec.CommandContext(ctx, cmdPath, args...).Run()
+	cmd := exec.CommandContext(ctx, cmdPath, d.Args...)
+	setEnv(cmd, d.Env)
+
+	runErr := cmd.Run()
 
 	var exitErr *exec.ExitError
 	if runErr != nil && errors.As(runErr, &exitErr) {
-		fmt.Println(string(exitErr.Stderr))
 		return fmt.Errorf("command failed with status:%d", exitErr.ExitCode())
 	}
 
@@ -26,4 +34,10 @@ func Do(ctx context.Context, cmd string, args ...string) error {
 		return fmt.Errorf("command failed with error:%w", runErr)
 	}
 	return nil
+}
+
+func setEnv(c *exec.Cmd, env map[string]string) {
+	for k, v := range env {
+		c.Env = append(c.Env, fmt.Sprintf("%s=%s", k, v))
+	}
 }

@@ -20,6 +20,10 @@ import (
 const defaultExecTimeout = 30 * time.Second
 const defaultMaxConsecFailures = 10
 
+type cmdExecer interface {
+	ExecContext(ctx context.Context) error
+}
+
 type sinkExecConfig struct {
 	sinkConfig
 	*execConfig
@@ -45,9 +49,8 @@ type sinkConfig struct {
 }
 
 type execConfig struct {
-	cmd        string
 	cmdTimeout time.Duration
-	args       []string
+	command    cmdExecer
 }
 
 type Process struct {
@@ -87,11 +90,14 @@ func makeSinkExecConfigs(templConfig map[string]*TemplateConfig) []sinkExecConfi
 
 		specExec := spec.Exec
 		if specExec != nil {
-			var ec execConfig
-			ec.args = expandEnvs(specExec.CmdArgs)
-			ec.cmd = specExec.Cmd
-			ec.cmdTimeout = cmp.Or(time.Duration(specExec.CmdTimeout), defaultExecTimeout)
-			scs[i].execConfig = &ec
+			scs[i].execConfig = &execConfig{
+				cmdTimeout: cmp.Or(time.Duration(specExec.CmdTimeout), defaultExecTimeout),
+				command: &cmdexec.Default{
+					Args: expandEnvs(specExec.CmdArgs),
+					Cmd:  specExec.Cmd,
+					Env:  nil,
+				},
+			}
 		}
 		i++
 	}
@@ -227,6 +233,7 @@ func (p *Process) renderAndExec(_ context.Context, cfg sinkExecConfig, sink rend
 		return nil
 	}
 
+	commandExecutor := cfg.command
 	errCh := make(chan error, 1)
 	go func() {
 		// use a new context
@@ -236,7 +243,7 @@ func (p *Process) renderAndExec(_ context.Context, cfg sinkExecConfig, sink rend
 		// main context
 		cmdCtx, cancel := context.WithTimeout(context.Background(), cfg.cmdTimeout)
 		defer cancel()
-		if err := cmdexec.Do(cmdCtx, cfg.cmd, cfg.execConfig.args...); err != nil {
+		if err := commandExecutor.ExecContext(cmdCtx); err != nil {
 			errCh <- err
 			return
 		}

@@ -78,17 +78,6 @@ func (a *Actions) FuncMap() template.FuncMap {
 			}
 			return s, nil
 		},
-		"GET_Any": func(endpoint string) (any, error) {
-			bs, err := a.getAndReadBody(endpoint)
-			if err != nil {
-				return nil, err
-			}
-			var data any
-			if err := json.Unmarshal(bs, &data); err != nil {
-				return nil, err
-			}
-			return data, nil
-		},
 	}
 }
 
