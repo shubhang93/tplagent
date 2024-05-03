@@ -180,6 +180,23 @@ func Test_renderLoop(t *testing.T) {
 		})
 	}
 
+	t.Run("test consec failures", func(t *testing.T) {
+		proc := &Process{Logger: newLogger(), maxConsecFailures: 5}
+		cfg := sinkExecConfig{
+			sinkConfig: sinkConfig{
+				name:            "test",
+				parsed:          actionable.NewTemplate("test", false),
+				refreshInterval: 1 * time.Second,
+			},
+		}
+		err := proc.startRenderLoop(context.Background(), cfg, func(ctx context.Context, config sinkExecConfig, sink render.Sink) error {
+			return errors.New("error occurred")
+		})
+		if !errors.Is(err, errTooManyFailures) {
+			t.Errorf("expected: %v got: %v", errTooManyFailures, err)
+		}
+	})
+
 	t.Run("init template", func(t *testing.T) {
 		err := initTemplate(&sinkExecConfig{
 			sinkConfig: sinkConfig{

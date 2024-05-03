@@ -1,5 +1,7 @@
 package fatal
 
+import "fmt"
+
 type Error struct {
 	err error
 }
@@ -8,8 +10,12 @@ func (e Error) Error() string {
 	return e.err.Error()
 }
 
+func (e Error) Unwrap() error {
+	return e.err
+}
+
 func NewError(err error) error {
-	return Error{err: err}
+	return Error{err: fmt.Errorf("%w", err)}
 }
 
 func (e Error) Fatal() bool {
