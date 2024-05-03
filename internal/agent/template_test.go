@@ -98,4 +98,13 @@ hello Foo`
 		}
 
 	})
+	t.Run("should not panic when setTemplateDelims is called with less than 2 delims", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Error("panicked")
+			}
+		}()
+		templ := actionable.NewTemplate("test", false)
+		setTemplateDelims(templ, []string{"<<"})
+	})
 }
