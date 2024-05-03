@@ -107,4 +107,35 @@ hello Foo`
 		templ := actionable.NewTemplate("test", false)
 		setTemplateDelims(templ, []string{"<<"})
 	})
+
+	t.Run("when setTemplateDelims is called with less correct delims", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Error("panicked")
+			}
+		}()
+		templ := actionable.NewTemplate("test", false)
+		setTemplateDelims(templ, []string{"<<", ">>"})
+		if err := parseTemplate(`hey <<.name>>`, "", templ); err != nil {
+			t.Error(err)
+			return
+		}
+
+		expected := `hey Foo`
+
+		var buff bytes.Buffer
+		err := templ.Execute(&buff, map[string]string{"name": "Foo"})
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		got := buff.String()
+		diff := cmp.Diff(expected, got)
+		if diff != "" {
+			t.Error(diff)
+		}
+
+	})
+
 }
