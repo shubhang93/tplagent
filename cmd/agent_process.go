@@ -21,16 +21,6 @@ var sighupReceived = errors.New("context canceled: SIGHUP")
 const pidDir = "/tmp/tplagent"
 const pidFilename = "agent.pid"
 
-func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	defer cancel()
-	err := startCLI(ctx, os.Stdout, os.Args[1:]...)
-	if err != nil && !isCtxErr(err) {
-		_, _ = fmt.Fprintf(os.Stderr, "cmd failed with:%s", err.Error())
-		os.Exit(1)
-	}
-}
-
 func startAgent(ctx context.Context, configFilePath string) error {
 	pid := os.Getpid()
 	writePID(pid)
@@ -86,14 +76,13 @@ func spawnAndReload(rootCtx context.Context, processMaker func(logger *slog.Logg
 				cancel(err)
 			}
 		case <-ctx.Done():
+			// wait for process to exit
+			// completely
 			err := <-spawnErrChan
 			if err != nil {
 				spawnErr = err
 			}
 			cancel(ctx.Err())
-			// acquiring sem ensures that
-			// the last spawned process
-			// has completed its execution
 			run = false
 		}
 	}
@@ -111,10 +100,10 @@ func spawn(ctx context.Context, processMaker func(logger *slog.Logger) agentProc
 	logger := newLogger(logFmt, config.Agent.LogLevel)
 
 	if isReload {
-		logger.Info("agent reloading")
+		logger.Info("reloading agent")
+	} else {
+		logger.Info("starting agent")
 	}
-
-	logger.Info("starting agent")
 
 	proc := processMaker(logger)
 	err = proc.Start(ctx, config)

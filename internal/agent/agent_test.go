@@ -232,7 +232,10 @@ func Test_renderLoop(t *testing.T) {
 	})
 
 	t.Run("test render and refresh for a valid config", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 5000*time.Millisecond)
+
+		runFor := 5 * time.Second
+
+		ctx, cancel := context.WithTimeout(context.Background(), runFor)
 		defer cancel()
 
 		templ1 := `Name: {{.name}}`
@@ -255,9 +258,10 @@ func Test_renderLoop(t *testing.T) {
 		dest1 := tmpDir + "/test1.render"
 		dest2 := tmpDir + "/dest2.render"
 
+		refreshInterval := 1 * time.Second
 		configs := []sinkExecConfig{{
 			sinkConfig: sinkConfig{
-				refreshInterval: 1 * time.Second,
+				refreshInterval: refreshInterval,
 				dest:            dest1,
 				staticData:      map[string]string{"name": "foo"},
 				name:            "template1",
@@ -265,7 +269,7 @@ func Test_renderLoop(t *testing.T) {
 			},
 		}, {
 			sinkConfig: sinkConfig{
-				refreshInterval: 1 * time.Second,
+				refreshInterval: refreshInterval,
 				dest:            dest2,
 				staticData:      map[string]string{"name": "foo"},
 				name:            "template2",
@@ -303,8 +307,11 @@ func Test_renderLoop(t *testing.T) {
 		if err := p.startTickLoops(ctx, tf); fatal.Is(err) {
 			t.Errorf("startTickLoops failed with error:%v", err)
 		}
+
+		NloopRuns := runFor / refreshInterval
+
 		for name, lrc := range loopRunCounts {
-			if lrc < 3 {
+			if lrc < int(NloopRuns-2) {
 				t.Errorf("loop run count for %s < 3 got:%d", name, lrc)
 				return
 			}

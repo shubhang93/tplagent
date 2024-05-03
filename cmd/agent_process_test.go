@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/google/go-cmp/cmp"
 	"github.com/shubhang93/tplagent/internal/agent"
+	"github.com/shubhang93/tplagent/internal/fatal"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -61,7 +63,9 @@ func Test_spawnAndReload(t *testing.T) {
 			expectedContextCauses = append(expectedContextCauses, sighupReceived.Error())
 		}
 
+		wait := make(chan struct{})
 		go func() {
+			defer close(wait)
 			time.Sleep(100 * time.Millisecond)
 			for i := range reloadTimes {
 				cfgFileLocation := tmpDir + "/agent-config.json"
@@ -99,7 +103,10 @@ func Test_spawnAndReload(t *testing.T) {
 			return ma
 		}
 
-		_ = spawnAndReload(ctx, processMaker, cfgFileLocation)
+		err = spawnAndReload(ctx, processMaker, cfgFileLocation)
+		if err != nil {
+			t.Error(err)
+		}
 
 		expectedConfigs := append([]agent.Config{oldConfig}, newConfigs...)
 
@@ -112,6 +119,102 @@ func Test_spawnAndReload(t *testing.T) {
 		if diff := cmp.Diff(expectedContextCauses, gotContextCauses); diff != "" {
 			t.Errorf("(--Want ++Got)\n%s", diff)
 		}
+
+		<-wait
+	})
+
+	t.Run("SIGHUP with fatal error", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 2000*time.Millisecond)
+		defer cancel()
+
+		oldConfig := makeConfig("old", tmpDir)
+
+		cfgFileLocation := tmpDir + "/agent-config.json"
+		f, err := os.OpenFile(cfgFileLocation, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0755)
+		if err != nil {
+			t.Errorf("error creating config file:%v", err)
+			return
+		}
+
+		err = json.NewEncoder(f).Encode(&oldConfig)
+		if err != nil {
+			t.Errorf("error writing old config:%v", err)
+			return
+		}
+		_ = f.Close()
+
+		p, err := os.FindProcess(os.Getpid())
+		if err != nil {
+			t.Errorf("failed to get process:%v", err)
+			return
+		}
+
+		reloadTimes := 5
+
+		var newConfigs []agent.Config
+		for i := range reloadTimes {
+			cfgSuffix := fmt.Sprintf("new%d", i)
+			newConfig := makeConfig(cfgSuffix, tmpDir)
+			newConfigs = append(newConfigs, newConfig)
+		}
+
+		wait := make(chan struct{})
+		go func() {
+			defer close(wait)
+			time.Sleep(100 * time.Millisecond)
+			for i := range reloadTimes {
+				cfgFileLocation := tmpDir + "/agent-config.json"
+				f, err := os.OpenFile(cfgFileLocation, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0755)
+				if err != nil {
+					t.Errorf("error creating config file:%v", err)
+					return
+				}
+				newConfig := newConfigs[i]
+				if err := json.NewEncoder(f).Encode(&newConfig); err != nil {
+					t.Errorf("error writing config:%d:%v", i, err)
+					return
+				}
+				_ = f.Close()
+				_ = p.Signal(syscall.SIGHUP)
+				time.Sleep(100 * time.Millisecond)
+			}
+		}()
+
+		var gotConfigs []agent.Config
+		var gotContextCauses []string
+
+		ma := mockAgent(func(ctx context.Context, config agent.Config) error {
+
+			select {
+			case <-ctx.Done():
+				gotConfigs = append(gotConfigs, config)
+				gotContextCauses = append(gotContextCauses, context.Cause(ctx).Error())
+			}
+
+			return fatal.NewError(errors.New("fatal error"))
+		})
+
+		processMaker := func(l *slog.Logger) agentProcess {
+			return ma
+		}
+
+		err = spawnAndReload(ctx, processMaker, cfgFileLocation)
+		if err == nil {
+			t.Errorf("expected fatal error got %v", err)
+		}
+
+		expectedConfigs := append([]agent.Config{oldConfig})
+
+		if diff := cmp.Diff(expectedConfigs, gotConfigs); diff != "" {
+			t.Errorf("(--Want ++Got)\n%s", diff)
+			return
+		}
+
+		expectedContextCauses := []string{sighupReceived.Error()}
+		if diff := cmp.Diff(expectedContextCauses, gotContextCauses); diff != "" {
+			t.Errorf("(--Want ++Got)\n%s", diff)
+		}
+		<-wait
 	})
 
 	t.Run("SIGINT,SIGTERM", func(t *testing.T) {

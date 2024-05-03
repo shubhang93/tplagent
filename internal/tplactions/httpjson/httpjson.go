@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"text/template"
 	"time"
 )
@@ -20,9 +21,10 @@ type Auth struct {
 }
 
 type Config struct {
-	BaseURL string            `json:"base_url"`
-	Auth    *Auth             `json:"auth"`
-	Timeout duration.Duration `json:"timeout"`
+	BaseURL       string            `json:"base_url"`
+	Auth          *Auth             `json:"auth"`
+	Timeout       duration.Duration `json:"timeout"`
+	ErrorStatuses []int             `json:"error_statuses"`
 }
 
 type Actions struct {
@@ -39,6 +41,11 @@ func (a *Actions) getAndReadBody(endpoint string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if slices.Contains(a.Conf.ErrorStatuses, resp.StatusCode) {
+		return nil, fmt.Errorf("req for %s failed with status %d", endpoint, resp.StatusCode)
+	}
+
 	bs, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
@@ -53,6 +60,7 @@ func (a *Actions) FuncMap() template.FuncMap {
 			if err != nil {
 				return nil, err
 			}
+
 			var m map[string]any
 			if err := json.Unmarshal(bs, &m); err != nil {
 				return nil, err
@@ -69,6 +77,17 @@ func (a *Actions) FuncMap() template.FuncMap {
 				return nil, err
 			}
 			return s, nil
+		},
+		"GET_Any": func(endpoint string) (any, error) {
+			bs, err := a.getAndReadBody(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			var data any
+			if err := json.Unmarshal(bs, &data); err != nil {
+				return nil, err
+			}
+			return data, nil
 		},
 	}
 }

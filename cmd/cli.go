@@ -21,6 +21,9 @@ func startCLI(ctx context.Context, stdout io.Writer, args ...string) error {
 	startCmd := flag.NewFlagSet("start", flag.ExitOnError)
 	configPath := startCmd.String("config", defaultConfigPath, "-config /path/to/config.json")
 
+	genConfCmd := flag.NewFlagSet("genconf", flag.ExitOnError)
+	numBlocks := genConfCmd.Int("n", 1, "-n 2")
+
 	cmd := args[0]
 	args = args[1:]
 	switch cmd {
@@ -30,8 +33,17 @@ func startCLI(ctx context.Context, stdout io.Writer, args ...string) error {
 			return err
 		}
 		return startAgent(ctx, *configPath)
-	case "generate":
-		err := agent.GenerateConfig(stdout)
+	case "genconf":
+		err := genConfCmd.Parse(args)
+		if err != nil {
+			return err
+		}
+
+		if *numBlocks < 1 {
+			*numBlocks = 1
+		}
+
+		err = agent.GenerateConfig(*numBlocks, stdout)
 		if err != nil {
 			return err
 		}

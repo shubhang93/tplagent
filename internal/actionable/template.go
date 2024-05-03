@@ -13,7 +13,7 @@ type Template struct {
 	activeActions []tplactions.Interface
 }
 
-func NewTemplate(name string, html bool, opts ...string) *Template {
+func NewTemplate(name string, html bool) *Template {
 	t := &Template{}
 	if html {
 		t.html = template.New(name)

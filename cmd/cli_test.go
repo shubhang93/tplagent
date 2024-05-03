@@ -21,11 +21,57 @@ func Test_cli(t *testing.T) {
 	t.Run("test generate", func(t *testing.T) {
 		stdout := bytes.Buffer{}
 		expected := bytes.Buffer{}
-		_ = startCLI(context.Background(), &stdout, "generate")
+		err := startCLI(context.Background(), &stdout, "genconf", "-n", "2")
+		if err != nil {
+			t.Error(err)
+			return
+		}
 
 		jd := json.NewEncoder(&expected)
 		jd.SetIndent("", " ")
-		if err := jd.Encode(agent.StarterConfig); err != nil {
+
+		starter := agent.Config{
+			Agent: agent.AgentConfig{
+				LogLevel:               slog.LevelInfo,
+				LogFmt:                 "text",
+				MaxConsecutiveFailures: 10,
+			},
+			TemplateSpecs: map[string]*agent.TemplateConfig{
+				"myapp-config1": {
+					Actions:     []agent.ActionsConfig{},
+					Source:      "/path/to/template-file1",
+					Destination: "/path/to/outfile1",
+					StaticData: map[string]string{
+						"key": "value",
+					},
+					RefreshInterval: duration.Duration(1 * time.Second),
+					RenderOnce:      false,
+					MissingKey:      "error",
+					Exec: &agent.ExecConfig{
+						Cmd:        "echo",
+						CmdArgs:    []string{"hello"},
+						CmdTimeout: duration.Duration(30 * time.Second),
+					},
+				},
+				"myapp-config2": {
+					Actions:     []agent.ActionsConfig{},
+					Source:      "/path/to/template-file2",
+					Destination: "/path/to/outfile2",
+					StaticData: map[string]string{
+						"key": "value",
+					},
+					RefreshInterval: duration.Duration(1 * time.Second),
+					RenderOnce:      false,
+					MissingKey:      "error",
+					Exec: &agent.ExecConfig{
+						Cmd:        "echo",
+						CmdArgs:    []string{"hello"},
+						CmdTimeout: duration.Duration(30 * time.Second),
+					},
+				},
+			}}
+
+		if err := jd.Encode(starter); err != nil {
 			t.Errorf("error encoding:%v", err)
 			return
 		}
