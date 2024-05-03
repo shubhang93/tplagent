@@ -8,10 +8,10 @@ import (
 	"text/template"
 )
 
-func attachActions(t *actionable.Template, templActions []ActionsConfig) error {
+func attachActions(t *actionable.Template, registry map[string]tplactions.MakeFunc, templActions []ActionsConfig) error {
 	namesSpacedFuncMap := make(template.FuncMap)
 	for _, ta := range templActions {
-		actionMaker, ok := tplactions.Registry[ta.Name]
+		actionMaker, ok := registry[ta.Name]
 		if !ok {
 			return fmt.Errorf("invalid action name:%s", ta.Name)
 		}

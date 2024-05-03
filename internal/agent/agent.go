@@ -9,6 +9,7 @@ import (
 	"github.com/shubhang93/tplagent/internal/cmdexec"
 	"github.com/shubhang93/tplagent/internal/fatal"
 	"github.com/shubhang93/tplagent/internal/render"
+	"github.com/shubhang93/tplagent/internal/tplactions"
 	"log/slog"
 	"os"
 	"strings"
@@ -157,7 +158,7 @@ func initTemplate(sc *sinkExecConfig) error {
 	at := actionable.NewTemplate(sc.name, sc.html)
 	at.SetMissingKeyBehaviour(sc.missingKey)
 	setTemplateDelims(at, sc.templateDelims)
-	if err := attachActions(at, sc.actions); err != nil {
+	if err := attachActions(at, tplactions.Registry, sc.actions); err != nil {
 		return err
 	}
 	sc.parsed = at
