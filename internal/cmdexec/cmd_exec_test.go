@@ -15,14 +15,13 @@ func TestDo(t *testing.T) {
 		args        []string
 		beforeFunc  func()
 		cmd         string
-		timeout     time.Duration
 		expectError bool
 	}
 	temp := t.TempDir()
 	scriptName := "script.sh"
 	execTests := []execTest{{
 		name:        "bin exists",
-		cmd:         `echo "hello world"`,
+		cmd:         `echo`,
 		args:        []string{"hello world"},
 		expectError: false,
 	}, {
@@ -49,6 +48,11 @@ echo "hello world from script"
 		},
 		cmd:  "bash",
 		args: []string{"-c", fmt.Sprintf("%s/%s", temp, scriptName)},
+	}, {
+		name:        "command exits with a non zero exit code",
+		cmd:         "bash",
+		args:        []string{"-c", "exit 1"},
+		expectError: true,
 	}}
 
 	for _, et := range execTests {
@@ -56,17 +60,12 @@ echo "hello world from script"
 			if et.beforeFunc != nil {
 				et.beforeFunc()
 			}
-			var ctx = context.Background()
-			var cancel context.CancelFunc = func() {}
-			if et.timeout > 0 {
-				ctx, cancel = context.WithTimeout(context.Background(), et.timeout)
-			}
-			defer cancel()
 			defaultExecer := Default{
-				Cmd:  et.cmd,
-				Args: et.args,
+				Cmd:     et.cmd,
+				Args:    et.args,
+				Timeout: 10 * time.Second,
 			}
-			err := defaultExecer.ExecContext(ctx)
+			err := defaultExecer.ExecContext(context.Background())
 			if et.expectError && err == nil {
 				t.Errorf("expected error got nil")
 				return
