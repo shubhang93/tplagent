@@ -20,8 +20,12 @@ import (
 const defaultExecTimeout = 30 * time.Second
 const defaultMaxConsecFailures = 10
 
-type cmdExecer interface {
+type CMDExecer interface {
 	ExecContext(ctx context.Context) error
+}
+
+type Sinker interface {
+	Render(data any) error
 }
 
 type sinkExecConfig struct {
@@ -31,7 +35,7 @@ type sinkExecConfig struct {
 
 var errTooManyFailures = errors.New("too many failures")
 
-type tickFunc func(ctx context.Context, sink render.Sink, execer cmdExecer, staticData any) error
+type tickFunc func(ctx context.Context, sink Sinker, execer CMDExecer, staticData any) error
 
 type sinkConfig struct {
 	parsed          *actionable.Template
@@ -183,7 +187,7 @@ func (p *Process) startRenderLoop(ctx context.Context, cfg sinkExecConfig) error
 		WriteTo: cfg.dest,
 	}
 
-	var execer cmdExecer = nil
+	var execer CMDExecer = nil
 	ec := cfg.execConfig
 	if ec != nil {
 		execer = &cmdexec.Default{
@@ -197,7 +201,7 @@ func (p *Process) startRenderLoop(ctx context.Context, cfg sinkExecConfig) error
 	defer cfg.parsed.CloseActions()
 
 	if cfg.renderOnce {
-		if err := p.TickFunc(ctx, sink, execer, cfg.staticData); err != nil && !errors.Is(err, render.ContentsIdentical) {
+		if err := p.TickFunc(ctx, &sink, execer, cfg.staticData); err != nil && !errors.Is(err, render.ContentsIdentical) {
 			p.Logger.Error("RenderAndExec error", slog.String("error", err.Error()), slog.String("loop", cfg.name), slog.Bool("once", true))
 		}
 		return nil
@@ -210,7 +214,7 @@ func (p *Process) startRenderLoop(ctx context.Context, cfg sinkExecConfig) error
 			p.Logger.Info("stopping render sink", slog.String("sink", cfg.name), slog.String("cause", ctx.Err().Error()))
 			return ctx.Err()
 		case <-tick:
-			err := p.TickFunc(ctx, sink, execer, cfg.staticData)
+			err := p.TickFunc(ctx, &sink, execer, cfg.staticData)
 			switch {
 			case errors.Is(err, render.ContentsIdentical):
 				consecutiveFailures = 0
@@ -234,7 +238,7 @@ func (p *Process) startRenderLoop(ctx context.Context, cfg sinkExecConfig) error
 	return nil
 }
 
-func RenderAndExec(ctx context.Context, sink render.Sink, execer cmdExecer, staticData any) error {
+func RenderAndExec(ctx context.Context, sink Sinker, execer CMDExecer, staticData any) error {
 
 	select {
 	case <-ctx.Done():

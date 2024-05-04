@@ -31,7 +31,6 @@ func Test_spawnAndReload(t *testing.T) {
 		defer cancel()
 
 		oldConfig := makeConfig("old", tmpDir)
-
 		cfgFileLocation := tmpDir + "/agent-config.json"
 		f, err := os.OpenFile(cfgFileLocation, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0755)
 		if err != nil {
@@ -255,6 +254,38 @@ func Test_spawnAndReload(t *testing.T) {
 			return ma
 		}
 		_ = spawnAndReload(ctx, pm, cfgFileLocation)
+	})
+
+	t.Run("agent returns a fatal error", func(t *testing.T) {
+
+		startCount := 0
+		pm := func(l *slog.Logger) agentProcess {
+			return mockAgent(func(ctx context.Context, config agent.Config) error {
+				startCount++
+				return fatal.NewError(errors.New("fatal error"))
+			})
+		}
+
+		cfgFileLocation := tmpDir + "/agent-config.json"
+		f, err := os.OpenFile(cfgFileLocation, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0755)
+		if err != nil {
+			t.Errorf("error creating config file:%v", err)
+			return
+		}
+
+		cfg := makeConfig("test", tmpDir)
+		if err := json.NewEncoder(f).Encode(cfg); err != nil {
+			t.Error(err)
+			return
+		}
+
+		err = spawnAndReload(context.Background(), pm, f.Name())
+		if !fatal.Is(err) {
+			t.Errorf("expected fatal error got %v", err)
+		}
+		if startCount > 1 {
+			t.Error("agent reloaded")
+		}
 	})
 
 }

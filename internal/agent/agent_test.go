@@ -166,7 +166,7 @@ func Test_renderLoop(t *testing.T) {
 			defer cancel()
 
 			execCount := 0
-			onTick := func(ctx context.Context, sink render.Sink, execer cmdExecer, data any) error {
+			onTick := func(ctx context.Context, sink Sinker, execer CMDExecer, data any) error {
 				execCount++
 				return nil
 			}
@@ -189,7 +189,7 @@ func Test_renderLoop(t *testing.T) {
 	t.Run("test consec failures", func(t *testing.T) {
 		proc := &Process{
 			Logger: newLogger(),
-			TickFunc: func(ctx context.Context, _ render.Sink, _ cmdExecer, _ any) error {
+			TickFunc: func(ctx context.Context, _ Sinker, _ CMDExecer, _ any) error {
 				return errors.New("error occurred")
 			},
 			maxConsecFailures: 5,
@@ -211,7 +211,7 @@ func Test_renderLoop(t *testing.T) {
 
 		tickCount := 0
 		proc := Process{
-			TickFunc: func(ctx context.Context, _ render.Sink, _ cmdExecer, _ any) error {
+			TickFunc: func(ctx context.Context, _ Sinker, _ CMDExecer, _ any) error {
 				tickCount++
 				switch tickCount {
 				case 1, 2, 3:
@@ -278,7 +278,7 @@ func Test_renderLoop(t *testing.T) {
 				},
 			}}
 
-		tf := tickFunc(func(ctx context.Context, _ render.Sink, _ cmdExecer, _ any) error {
+		tf := tickFunc(func(ctx context.Context, _ Sinker, _ CMDExecer, _ any) error {
 			return nil
 		})
 		p := Process{
@@ -338,6 +338,7 @@ func Test_renderLoop(t *testing.T) {
 				staticData:      map[string]string{"name": "foo"},
 				name:            "template2",
 				readFrom:        src2,
+				html:            true,
 			},
 			execConfig: &execConfig{
 				cmd:  `echo`,
@@ -346,8 +347,8 @@ func Test_renderLoop(t *testing.T) {
 		}}
 
 		var mu sync.Mutex
-		loopRunCounts := map[string]int{}
-		tf := tickFunc(func(ctx context.Context, sink render.Sink, execer cmdExecer, data any) error {
+		loopRunCounts := map[Sinker]int{}
+		tf := tickFunc(func(ctx context.Context, sink Sinker, execer CMDExecer, data any) error {
 			err := RenderAndExec(ctx, sink, execer, data)
 			switch {
 			case errors.Is(err, context.DeadlineExceeded):
@@ -358,7 +359,7 @@ func Test_renderLoop(t *testing.T) {
 			}
 
 			mu.Lock()
-			loopRunCounts[sink.WriteTo]++
+			loopRunCounts[sink]++
 			mu.Unlock()
 			return nil
 		})

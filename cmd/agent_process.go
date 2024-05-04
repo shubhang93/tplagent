@@ -66,7 +66,6 @@ func spawnAndReload(rootCtx context.Context, processMaker func(logger *slog.Logg
 				run = false
 				break
 			}
-
 			ctx, cancel = context.WithCancelCause(rootCtx)
 			go func() {
 				err := spawn(ctx, processMaker, configPath, true)

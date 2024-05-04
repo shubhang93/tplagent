@@ -9,10 +9,18 @@ import (
 	"time"
 )
 
-func GenerateConfig(numBlocks int, wr io.Writer) error {
+func WriteConfig(wr io.Writer, numBlocks int) error {
+	starter := generateConfig(numBlocks)
+
 	jd := json.NewEncoder(wr)
 	jd.SetIndent("", " ")
+	if err := jd.Encode(starter); err != nil {
+		return err
+	}
+	return nil
+}
 
+func generateConfig(numBlocks int) Config {
 	starter := Config{
 		Agent: AgentConfig{
 			LogLevel:               slog.LevelInfo,
@@ -27,11 +35,7 @@ func GenerateConfig(numBlocks int, wr io.Writer) error {
 		tplBlock := makeTemplBlock(num)
 		starter.TemplateSpecs[fmt.Sprintf("myapp-config%d", num)] = tplBlock
 	}
-
-	if err := jd.Encode(starter); err != nil {
-		return err
-	}
-	return nil
+	return starter
 }
 
 func makeTemplBlock(i int) *TemplateConfig {

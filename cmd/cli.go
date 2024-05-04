@@ -49,7 +49,7 @@ func startCLI(ctx context.Context, stdout io.Writer, args ...string) error {
 			*numBlocks = 1
 		}
 
-		err = agent.GenerateConfig(*numBlocks, stdout)
+		err = agent.WriteConfig(stdout, *numBlocks)
 		if err != nil {
 			return err
 		}

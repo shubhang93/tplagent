@@ -80,8 +80,56 @@ func Test_cli(t *testing.T) {
 			t.Errorf("(--Want ++Got):\n%s", diff)
 		}
 
-		t.Log(stdout.String())
 	})
+
+	t.Run("test generate when num block is less than 1", func(t *testing.T) {
+		stdout := bytes.Buffer{}
+		expected := bytes.Buffer{}
+		err := startCLI(context.Background(), &stdout, "genconf", "-n", "0")
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		jd := json.NewEncoder(&expected)
+		jd.SetIndent("", " ")
+
+		starter := agent.Config{
+			Agent: agent.AgentConfig{
+				LogLevel:               slog.LevelInfo,
+				LogFmt:                 "text",
+				MaxConsecutiveFailures: 10,
+			},
+			TemplateSpecs: map[string]*agent.TemplateConfig{
+				"myapp-config1": {
+					Actions:     []agent.ActionsConfig{},
+					Source:      "/path/to/template-file1",
+					Destination: "/path/to/outfile1",
+					StaticData: map[string]string{
+						"key": "value",
+					},
+					RefreshInterval: duration.Duration(1 * time.Second),
+					RenderOnce:      false,
+					MissingKey:      "error",
+					Exec: &agent.ExecConfig{
+						Cmd:        "echo",
+						CmdArgs:    []string{"hello"},
+						CmdTimeout: duration.Duration(30 * time.Second),
+					},
+				},
+			}}
+
+		if err := jd.Encode(starter); err != nil {
+			t.Errorf("error encoding:%v", err)
+			return
+		}
+
+		if diff := cmp.Diff(expected.String(), stdout.String()); diff != "" {
+			t.Errorf("(--Want ++Got):\n%s", diff)
+		}
+
+	})
+
 	t.Run("start agent test", func(t *testing.T) {
 		configFilePath := tmpDir + "/config.json"
 		dest := tmpDir + "/config.render"

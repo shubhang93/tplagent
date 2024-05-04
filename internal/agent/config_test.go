@@ -1,9 +1,11 @@
 package agent
 
 import (
+	"bytes"
 	"encoding/json"
 	"github.com/google/go-cmp/cmp"
 	"github.com/shubhang93/tplagent/internal/duration"
+	"github.com/shubhang93/tplagent/internal/fatal"
 	"log/slog"
 	"strings"
 	"testing"
@@ -194,4 +196,69 @@ func Test_readConfig(t *testing.T) {
 			t.Errorf("(-Want +Got):\n%s", diff)
 		}
 	})
+}
+
+func Test_config_fatalErrors(t *testing.T) {
+	t.Run("ReadConfig fails", func(t *testing.T) {
+		_, err := ReadConfigFromFile("/some/path/that/does/not/exist")
+		if !fatal.Is(err) {
+			t.Error("expected fatal error")
+		}
+	})
+
+	t.Run("config decoding fails", func(t *testing.T) {
+		var buff bytes.Buffer
+		err := WriteConfig(&buff, 1)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		// mangle the json
+		jsonCfg := buff.Bytes()
+		i := bytes.Index(jsonCfg, []byte{'{'})
+		jsonCfg[i] = '['
+		buff.Reset()
+		buff.Write(jsonCfg)
+
+		_, err = readConfig(&buff)
+		if !fatal.Is(err) {
+			t.Error("expected fatal error")
+			return
+		}
+
+	})
+	t.Run("config validation fails", func(t *testing.T) {
+		var buff bytes.Buffer
+		err := WriteConfig(&buff, 1)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		var c Config
+		err = json.NewDecoder(&buff).Decode(&c)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		for _, spec := range c.TemplateSpecs {
+			spec.RefreshInterval = duration.Duration(500 * time.Millisecond)
+		}
+
+		buff.Reset()
+		err = json.NewEncoder(&buff).Encode(c)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		_, err = readConfig(&buff)
+		if !fatal.Is(err) {
+			t.Error("expected fatal error")
+		}
+
+	})
+
 }

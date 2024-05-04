@@ -122,6 +122,7 @@ func (s *Sink) init() {
 	if s.copyBuffer == nil {
 		s.copyBuffer = make([]byte, copyBuffSize)
 	}
+
 }
 
 func ensureDestDirs(filename string) error {
