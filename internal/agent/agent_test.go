@@ -7,7 +7,6 @@ import (
 	"fmt"
 	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/shubhang93/tplagent/internal/actionable"
-	"github.com/shubhang93/tplagent/internal/cmdexec"
 	"github.com/shubhang93/tplagent/internal/duration"
 	"github.com/shubhang93/tplagent/internal/fatal"
 	"github.com/shubhang93/tplagent/internal/render"
@@ -69,12 +68,10 @@ func Test_makeSinkExecConfigs(t *testing.T) {
 					readFrom:        homeDir + "/testdir",
 				},
 				execConfig: &execConfig{
-					cmdTimeout: 5 * time.Second,
-					command: &cmdexec.Default{
-						Args: []string{"hello"},
-						Cmd:  "echo",
-						Env:  nil,
-					},
+					timeout: 5 * time.Second,
+					args:    []string{"hello"},
+					cmd:     "echo",
+					env:     nil,
 				},
 			},
 			{
@@ -90,11 +87,9 @@ func Test_makeSinkExecConfigs(t *testing.T) {
 					renderOnce: true,
 				},
 				execConfig: &execConfig{
-					command: &cmdexec.Default{
-						Args: []string{"hello"},
-						Cmd:  "echo",
-					},
-					cmdTimeout: 30 * time.Second,
+					args:    []string{"hello"},
+					cmd:     "echo",
+					timeout: 30 * time.Second,
 				},
 			}}
 
@@ -139,11 +134,9 @@ func Test_renderLoop(t *testing.T) {
 				name:            "test-tmpl",
 			},
 			execConfig: &execConfig{
-				command: &cmdexec.Default{
-					Args: []string{"hello"},
-					Cmd:  "echo",
-				},
-				cmdTimeout: 30 * time.Second,
+				args:    []string{"hello"},
+				cmd:     "echo",
+				timeout: 30 * time.Second,
 			},
 		},
 	}, {
@@ -159,12 +152,10 @@ func Test_renderLoop(t *testing.T) {
 				name:            "test-tmpl",
 			},
 			execConfig: &execConfig{
-				command: &cmdexec.Default{
-					Cmd:  `echo`,
-					Args: []string{"hello"},
-					Env:  nil,
-				},
-				cmdTimeout: 30 * time.Second,
+				cmd:     `echo`,
+				args:    []string{"hello"},
+				env:     nil,
+				timeout: 30 * time.Second,
 			},
 		},
 	}}
@@ -175,13 +166,17 @@ func Test_renderLoop(t *testing.T) {
 			defer cancel()
 
 			execCount := 0
-			onTick := func(ctx context.Context, config sinkExecConfig, sink render.Sink) error {
+			onTick := func(ctx context.Context, sink render.Sink, execer cmdExecer, data any) error {
 				execCount++
 				return nil
 			}
 
-			p := Process{Logger: newLogger(), maxConsecFailures: 10}
-			err := p.startRenderLoop(ctx, ltest.cfg, onTick)
+			p := Process{
+				Logger:            newLogger(),
+				maxConsecFailures: 10,
+				TickFunc:          onTick,
+			}
+			err := p.startRenderLoop(ctx, ltest.cfg)
 			if err != nil && !errors.Is(err, context.DeadlineExceeded) {
 				t.Errorf("%v", err)
 			}
@@ -192,7 +187,13 @@ func Test_renderLoop(t *testing.T) {
 	}
 
 	t.Run("test consec failures", func(t *testing.T) {
-		proc := &Process{Logger: newLogger(), maxConsecFailures: 5}
+		proc := &Process{
+			Logger: newLogger(),
+			TickFunc: func(ctx context.Context, _ render.Sink, _ cmdExecer, _ any) error {
+				return errors.New("error occurred")
+			},
+			maxConsecFailures: 5,
+		}
 		cfg := sinkExecConfig{
 			sinkConfig: sinkConfig{
 				name:            "test",
@@ -200,16 +201,24 @@ func Test_renderLoop(t *testing.T) {
 				refreshInterval: 1 * time.Second,
 			},
 		}
-		err := proc.startRenderLoop(context.Background(), cfg, func(ctx context.Context, config sinkExecConfig, sink render.Sink) error {
-			return errors.New("error occurred")
-		})
+		err := proc.startRenderLoop(context.Background(), cfg)
 		if !errors.Is(err, errTooManyFailures) {
 			t.Errorf("expected: %v got: %v", errTooManyFailures, err)
 		}
 	})
 
 	t.Run("reset consec failures reset", func(t *testing.T) {
+
+		tickCount := 0
 		proc := Process{
+			TickFunc: func(ctx context.Context, _ render.Sink, _ cmdExecer, _ any) error {
+				tickCount++
+				switch tickCount {
+				case 1, 2, 3:
+					return errors.New("error occurred")
+				}
+				return render.ContentsIdentical
+			},
 			Logger:            newLogger(),
 			maxConsecFailures: 4,
 		}
@@ -225,15 +234,7 @@ func Test_renderLoop(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), n*time.Second)
 		defer cancel()
 
-		tickCount := 0
-		err := proc.startRenderLoop(ctx, cfg, func(ctx context.Context, config sinkExecConfig, sink render.Sink) error {
-			tickCount++
-			switch tickCount {
-			case 1, 2, 3:
-				return errors.New("error occurred")
-			}
-			return render.ContentsIdentical
-		})
+		err := proc.startRenderLoop(ctx, cfg)
 		if errors.Is(err, errTooManyFailures) {
 			t.Error(err)
 		}
@@ -277,15 +278,16 @@ func Test_renderLoop(t *testing.T) {
 				},
 			}}
 
-		p := Process{
-			Logger:  newLogger(),
-			configs: scs,
-		}
-
-		tf := tickFunc(func(ctx context.Context, config sinkExecConfig, sink render.Sink) error {
+		tf := tickFunc(func(ctx context.Context, _ render.Sink, _ cmdExecer, _ any) error {
 			return nil
 		})
-		err := p.startTickLoops(context.Background(), tf)
+		p := Process{
+			Logger:   newLogger(),
+			configs:  scs,
+			TickFunc: tf,
+		}
+
+		err := p.startTickLoops(context.Background())
 		if err == nil {
 			t.Error("expected error but got nil")
 			return
@@ -338,37 +340,36 @@ func Test_renderLoop(t *testing.T) {
 				readFrom:        src2,
 			},
 			execConfig: &execConfig{
-				command: &cmdexec.Default{
-					Cmd:  `echo`,
-					Args: []string{"hello"},
-				},
+				cmd:  `echo`,
+				args: []string{"hello"},
 			},
 		}}
-		p := Process{
-			Logger:            newLogger(),
-			configs:           configs,
-			maxConsecFailures: 10,
-		}
 
 		var mu sync.Mutex
 		loopRunCounts := map[string]int{}
-		tf := tickFunc(func(ctx context.Context, config sinkExecConfig, sink render.Sink) error {
-			err := p.renderAndExec(ctx, config, sink)
+		tf := tickFunc(func(ctx context.Context, sink render.Sink, execer cmdExecer, data any) error {
+			err := RenderAndExec(ctx, sink, execer, data)
 			switch {
 			case errors.Is(err, context.DeadlineExceeded):
 			case errors.Is(err, render.ContentsIdentical):
 			case err != nil:
-				t.Errorf("renderAndExec failed for %s:%v", config.name, err)
+				t.Errorf("RenderAndExec failed for %v", err)
 
 			}
 
 			mu.Lock()
-			loopRunCounts[config.name]++
+			loopRunCounts[sink.WriteTo]++
 			mu.Unlock()
 			return nil
 		})
+		p := Process{
+			Logger:            newLogger(),
+			configs:           configs,
+			maxConsecFailures: 10,
+			TickFunc:          tf,
+		}
 
-		if err := p.startTickLoops(ctx, tf); fatal.Is(err) {
+		if err := p.startTickLoops(ctx); fatal.Is(err) {
 			t.Errorf("startTickLoops failed with error:%v", err)
 		}
 

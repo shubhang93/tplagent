@@ -31,7 +31,7 @@ type sinkExecConfig struct {
 
 var errTooManyFailures = errors.New("too many failures")
 
-type tickFunc func(ctx context.Context, config sinkExecConfig, sink render.Sink) error
+type tickFunc func(ctx context.Context, sink render.Sink, execer cmdExecer, staticData any) error
 
 type sinkConfig struct {
 	parsed          *actionable.Template
@@ -49,12 +49,15 @@ type sinkConfig struct {
 }
 
 type execConfig struct {
-	cmdTimeout time.Duration
-	command    cmdExecer
+	cmd     string
+	timeout time.Duration
+	args    []string
+	env     map[string]string
 }
 
 type Process struct {
 	Logger            *slog.Logger
+	TickFunc          tickFunc
 	configs           []sinkExecConfig
 	maxConsecFailures int
 }
@@ -64,39 +67,37 @@ func (p *Process) Start(ctx context.Context, config Config) error {
 	scs := makeSinkExecConfigs(templConfig)
 	p.configs = scs
 	p.maxConsecFailures = cmp.Or(config.Agent.MaxConsecutiveFailures, defaultMaxConsecFailures)
-	return p.startTickLoops(ctx, p.renderAndExec)
+	return p.startTickLoops(ctx)
 }
 
 func makeSinkExecConfigs(templConfig map[string]*TemplateConfig) []sinkExecConfig {
 	var i int
 	var scs = make([]sinkExecConfig, len(templConfig))
 	for name := range templConfig {
-		spec := templConfig[name]
+		specTempl := templConfig[name]
 		scs[i] = sinkExecConfig{
 			sinkConfig: sinkConfig{
-				refreshInterval: time.Duration(spec.RefreshInterval),
-				html:            spec.HTML,
-				templateDelims:  spec.TemplateDelimiters,
-				actions:         spec.Actions,
-				readFrom:        os.ExpandEnv(spec.Source),
-				dest:            os.ExpandEnv(spec.Destination),
-				staticData:      spec.StaticData,
+				refreshInterval: time.Duration(specTempl.RefreshInterval),
+				html:            specTempl.HTML,
+				templateDelims:  specTempl.TemplateDelimiters,
+				actions:         specTempl.Actions,
+				readFrom:        os.ExpandEnv(specTempl.Source),
+				dest:            os.ExpandEnv(specTempl.Destination),
+				staticData:      specTempl.StaticData,
 				name:            name,
-				renderOnce:      cmp.Or(spec.RenderOnce || spec.RefreshInterval == 0),
-				raw:             spec.Raw,
-				missingKey:      strings.TrimSpace(spec.MissingKey),
+				renderOnce:      cmp.Or(specTempl.RenderOnce || specTempl.RefreshInterval == 0),
+				raw:             specTempl.Raw,
+				missingKey:      strings.TrimSpace(specTempl.MissingKey),
 			},
 		}
 
-		specExec := spec.Exec
+		specExec := specTempl.Exec
 		if specExec != nil {
 			scs[i].execConfig = &execConfig{
-				cmdTimeout: cmp.Or(time.Duration(specExec.CmdTimeout), defaultExecTimeout),
-				command: &cmdexec.Default{
-					Args: expandEnvs(specExec.CmdArgs),
-					Cmd:  specExec.Cmd,
-					Env:  nil,
-				},
+				cmd:     specExec.Cmd,
+				timeout: cmp.Or(time.Duration(specExec.CmdTimeout), defaultExecTimeout),
+				args:    expandEnvs(specExec.CmdArgs),
+				env:     nil,
 			}
 		}
 		i++
@@ -113,7 +114,7 @@ func (t templInitErr) Error() string {
 	return fmt.Sprintf("template init error for %s:%s", t.name, t.err.Error())
 }
 
-func (p *Process) startTickLoops(ctx context.Context, tf tickFunc) error {
+func (p *Process) startTickLoops(ctx context.Context) error {
 	var wg sync.WaitGroup
 	errsChan := make(chan error)
 
@@ -131,7 +132,7 @@ func (p *Process) startTickLoops(ctx context.Context, tf tickFunc) error {
 				p.Logger.Error("init template error", slog.String("error", err.Error()), slog.String("name", sc.name))
 				return
 			}
-			errsChan <- p.startRenderLoop(ctx, sc, tf)
+			errsChan <- p.startRenderLoop(ctx, sc)
 		}(i)
 	}
 
@@ -171,7 +172,7 @@ func initTemplate(sc *sinkExecConfig) error {
 	return parseTemplate(sc.raw, sc.readFrom, sc.parsed)
 }
 
-func (p *Process) startRenderLoop(ctx context.Context, cfg sinkExecConfig, onTick func(context.Context, sinkExecConfig, render.Sink) error) error {
+func (p *Process) startRenderLoop(ctx context.Context, cfg sinkExecConfig) error {
 	ticker := time.NewTicker(cfg.refreshInterval)
 	tick := ticker.C
 	defer ticker.Stop()
@@ -182,11 +183,22 @@ func (p *Process) startRenderLoop(ctx context.Context, cfg sinkExecConfig, onTic
 		WriteTo: cfg.dest,
 	}
 
+	var execer cmdExecer = nil
+	ec := cfg.execConfig
+	if ec != nil {
+		execer = &cmdexec.Default{
+			Args:    ec.args,
+			Cmd:     ec.cmd,
+			Env:     ec.env,
+			Timeout: ec.timeout,
+		}
+	}
+
 	defer cfg.parsed.CloseActions()
 
 	if cfg.renderOnce {
-		if err := onTick(ctx, cfg, sink); err != nil && !errors.Is(err, render.ContentsIdentical) {
-			p.Logger.Error("renderAndExec error", slog.String("error", err.Error()), slog.String("loop", cfg.name), slog.Bool("once", true))
+		if err := p.TickFunc(ctx, sink, execer, cfg.staticData); err != nil && !errors.Is(err, render.ContentsIdentical) {
+			p.Logger.Error("RenderAndExec error", slog.String("error", err.Error()), slog.String("loop", cfg.name), slog.Bool("once", true))
 		}
 		return nil
 	}
@@ -198,7 +210,7 @@ func (p *Process) startRenderLoop(ctx context.Context, cfg sinkExecConfig, onTic
 			p.Logger.Info("stopping render sink", slog.String("sink", cfg.name), slog.String("cause", ctx.Err().Error()))
 			return ctx.Err()
 		case <-tick:
-			err := onTick(ctx, cfg, sink)
+			err := p.TickFunc(ctx, sink, execer, cfg.staticData)
 			switch {
 			case errors.Is(err, render.ContentsIdentical):
 				consecutiveFailures = 0
@@ -222,28 +234,25 @@ func (p *Process) startRenderLoop(ctx context.Context, cfg sinkExecConfig, onTic
 	return nil
 }
 
-func (p *Process) renderAndExec(_ context.Context, cfg sinkExecConfig, sink render.Sink) error {
-	err := sink.Render(cfg.staticData)
+func RenderAndExec(_ context.Context, sink render.Sink, execer cmdExecer, staticData any) error {
+	err := sink.Render(staticData)
 
 	if err != nil {
 		return err
 	}
 
-	if cfg.execConfig == nil {
+	if execer == nil {
 		return nil
 	}
 
-	commandExecutor := cfg.command
 	errCh := make(chan error, 1)
 	go func() {
-		// use a new context
+		// use a new background context
 		// we want the cmd
 		// to exec within the timeout
 		// and not cancel on the
 		// main context
-		cmdCtx, cancel := context.WithTimeout(context.Background(), cfg.cmdTimeout)
-		defer cancel()
-		if err := commandExecutor.ExecContext(cmdCtx); err != nil {
+		if err := execer.ExecContext(context.Background()); err != nil {
 			errCh <- err
 			return
 		}

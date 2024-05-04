@@ -69,13 +69,13 @@ func readConfig(rr io.Reader) (Config, error) {
 	if err := json.NewDecoder(rr).Decode(&c); err != nil {
 		return Config{}, fatal.NewError(fmt.Errorf("config decode error:%w", err))
 	}
-	if err := validateConfig(&c); err != nil {
+	if err := ValidateConfig(&c); err != nil {
 		return Config{}, fatal.NewError(err)
 	}
 	return c, nil
 }
 
-func validateConfig(c *Config) error {
+func ValidateConfig(c *Config) error {
 	var valErrs []error
 	if _, ok := allowedLogFmts[c.Agent.LogFmt]; !ok {
 		valErrs = append(valErrs, fmt.Errorf("validate:invalid log level"))

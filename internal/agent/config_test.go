@@ -141,7 +141,7 @@ func Test_readConfig(t *testing.T) {
 				},
 			},
 		}
-		if err := validateConfig(c); err == nil {
+		if err := ValidateConfig(c); err == nil {
 			t.Errorf("expected error got nil")
 		} else {
 			t.Log(err)

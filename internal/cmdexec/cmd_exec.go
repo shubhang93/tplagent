@@ -5,22 +5,27 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"time"
 )
 
 type Default struct {
-	Args []string
-	Cmd  string
-	Env  map[string]string
+	Args    []string
+	Cmd     string
+	Env     map[string]string
+	Timeout time.Duration
 }
 
 func (d *Default) ExecContext(ctx context.Context) error {
+
+	ctxWithTimeout, cancel := context.WithTimeout(ctx, d.Timeout)
+	defer cancel()
 
 	cmdPath, err := exec.LookPath(d.Cmd)
 	if errors.Is(err, exec.ErrNotFound) {
 		return err
 	}
 
-	cmd := exec.CommandContext(ctx, cmdPath, d.Args...)
+	cmd := exec.CommandContext(ctxWithTimeout, cmdPath, d.Args...)
 	setEnv(cmd, d.Env)
 
 	runErr := cmd.Run()
