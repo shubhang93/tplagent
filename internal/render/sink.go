@@ -12,6 +12,7 @@ import (
 const tempFileExt = "temp"
 const bakFileExt = "bak"
 const mode = os.FileMode(0766)
+const copyBuffSize = 32 * 1024
 
 var ContentsIdentical = errors.New("identical contents")
 
@@ -50,17 +51,16 @@ func (s *Sink) Render(staticData any) error {
 			return ContentsIdentical
 		}
 
-		bakFile := fmt.Sprintf("%s.bak", s.WriteTo)
-		if err := os.WriteFile(bakFile, oldFileContents, mode); err != nil {
-			return fmt.Errorf("failed to create backup:%w", err)
+		if err := atomicBackup(s.WriteTo, bytes.NewReader(oldFileContents), s.copyBuffer); err != nil {
+			return fmt.Errorf("backup failed:%w", err)
 		}
 
-		if err := atomicWrite(s.WriteTo, s.fileContents, s.copyBuffer); err != nil {
+		if err := atomicWriteDest(s.WriteTo, s.fileContents, s.copyBuffer); err != nil {
 			return fmt.Errorf("atomic write failed:%w", err)
 		}
 
 	case errors.Is(readErr, os.ErrNotExist):
-		if err := atomicWrite(s.WriteTo, s.fileContents, s.copyBuffer); err != nil {
+		if err := atomicWriteDest(s.WriteTo, s.fileContents, s.copyBuffer); err != nil {
 			return fmt.Errorf("atomic write failed:%w", err)
 		}
 	default:
@@ -71,12 +71,30 @@ func (s *Sink) Render(staticData any) error {
 	return nil
 }
 
-func atomicWrite(dest string, contents io.Reader, copyBuff []byte) error {
+func atomicBackup(dest string, contents io.Reader, copyBuff []byte) error {
+	bakFilename := fmt.Sprintf("%s.%s", dest, bakFileExt)
+	bakFile, err := createWritableFile(bakFilename)
+	if err != nil {
+		return err
+	}
+	defer bakFile.Close()
+
+	clear(copyBuff)
+	_, err = io.CopyBuffer(bakFile, contents, copyBuff)
+	if err != nil {
+		_ = os.Remove(bakFilename)
+		return err
+	}
+	return nil
+}
+
+func atomicWriteDest(dest string, contents io.Reader, copyBuff []byte) error {
 	tempFileName := fmt.Sprintf("%s.%s", dest, tempFileExt)
 	tempFile, err := createWritableFile(tempFileName)
 	if err != nil {
 		return err
 	}
+	defer tempFile.Close()
 
 	clear(copyBuff)
 	if err := writeTempFile(tempFile, contents, copyBuff); err != nil {
@@ -102,7 +120,7 @@ func (s *Sink) init() {
 		s.fileContents = &bytes.Buffer{}
 	}
 	if s.copyBuffer == nil {
-		s.copyBuffer = make([]byte, 4096)
+		s.copyBuffer = make([]byte, copyBuffSize)
 	}
 }
 
@@ -121,7 +139,7 @@ func ensureDestDirs(filename string) error {
 }
 
 func createWritableFile(filename string) (*os.File, error) {
-	fi, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, mode)
+	fi, err := os.OpenFile(filename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, mode)
 	if err != nil {
 		return nil, err
 	}

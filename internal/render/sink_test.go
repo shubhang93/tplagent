@@ -90,7 +90,7 @@ func TestSink_Render(t *testing.T) {
 			return
 		}
 		endTime := time.Now()
-		t.Logf("redner took:%s", endTime.Sub(startTime))
+		t.Logf("render took:%s", endTime.Sub(startTime))
 
 		fi, err = os.Open(renderPath)
 		bs, err := io.ReadAll(fi)
