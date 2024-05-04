@@ -21,6 +21,10 @@ var sighupReceived = errors.New("context canceled: SIGHUP")
 const pidDir = "/tmp/tplagent"
 const pidFilename = "agent.pid"
 
+type agentProcess interface {
+	Start(context.Context, agent.Config) error
+}
+
 func startAgent(ctx context.Context, configFilePath string) error {
 	pid := os.Getpid()
 	writePID(pid)
@@ -29,14 +33,13 @@ func startAgent(ctx context.Context, configFilePath string) error {
 	}()
 
 	processMaker := func(l *slog.Logger) agentProcess {
-		return &agent.Process{Logger: l}
+		return &agent.Process{
+			Logger:   l,
+			TickFunc: agent.RenderAndExec,
+		}
 	}
 	return spawnAndReload(ctx, processMaker, configFilePath)
 
-}
-
-type agentProcess interface {
-	Start(context.Context, agent.Config) error
 }
 
 func spawnAndReload(rootCtx context.Context, processMaker func(logger *slog.Logger) agentProcess, configPath string) error {

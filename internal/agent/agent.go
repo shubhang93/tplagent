@@ -234,9 +234,15 @@ func (p *Process) startRenderLoop(ctx context.Context, cfg sinkExecConfig) error
 	return nil
 }
 
-func RenderAndExec(_ context.Context, sink render.Sink, execer cmdExecer, staticData any) error {
-	err := sink.Render(staticData)
+func RenderAndExec(ctx context.Context, sink render.Sink, execer cmdExecer, staticData any) error {
 
+	select {
+	case <-ctx.Done():
+		return nil
+	default:
+	}
+
+	err := sink.Render(staticData)
 	if err != nil {
 		return err
 	}
