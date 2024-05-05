@@ -16,7 +16,7 @@ const usage = `usage:
   tplagent genconf -n 1 -indent 4 > path/to/config.json
     -n:      number of template blocks to generate (default 1)
     -indent: indentation space in the generated config (default 2)
-
+	
 `
 
 const defaultConfigPath = "/etc/tplagent/config.json"
