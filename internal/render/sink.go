@@ -21,10 +21,10 @@ type executableTemplate interface {
 }
 
 type Sink struct {
-	Templ        executableTemplate
-	WriteTo      string
-	fileContents *bytes.Buffer
-	copyBuffer   []byte
+	Templ         executableTemplate
+	WriteTo       string
+	destFileBytes *bytes.Buffer
+	copyBuffer    []byte
 }
 
 func (s *Sink) Render(staticData any) error {
@@ -32,22 +32,22 @@ func (s *Sink) Render(staticData any) error {
 
 	defer func() {
 		clear(s.copyBuffer)
-		s.fileContents.Reset()
+		s.destFileBytes.Reset()
 	}()
 
 	if err := ensureDestDirs(s.WriteTo); err != nil {
 		return err
 	}
 
-	s.fileContents.Reset()
-	if err := renderTempl(s.Templ, s.fileContents, staticData); err != nil {
+	s.destFileBytes.Reset()
+	if err := renderTempl(s.Templ, s.destFileBytes, staticData); err != nil {
 		return err
 	}
 
 	oldFileContents, readErr := os.ReadFile(s.WriteTo)
 	switch {
 	case readErr == nil:
-		if res := bytes.Compare(oldFileContents, s.fileContents.Bytes()); res == 0 {
+		if res := bytes.Compare(oldFileContents, s.destFileBytes.Bytes()); res == 0 {
 			return ContentsIdentical
 		}
 
@@ -55,19 +55,18 @@ func (s *Sink) Render(staticData any) error {
 			return fmt.Errorf("backup failed:%w", err)
 		}
 
-		if err := atomicWriteDest(s.WriteTo, s.fileContents, s.copyBuffer); err != nil {
+		if err := atomicWriteDest(s.WriteTo, s.destFileBytes, s.copyBuffer); err != nil {
 			return fmt.Errorf("atomic write failed:%w", err)
 		}
 
 	case errors.Is(readErr, os.ErrNotExist):
-		if err := atomicWriteDest(s.WriteTo, s.fileContents, s.copyBuffer); err != nil {
+		if err := atomicWriteDest(s.WriteTo, s.destFileBytes, s.copyBuffer); err != nil {
 			return fmt.Errorf("atomic write failed:%w", err)
 		}
 	default:
 		return readErr
 
 	}
-
 	return nil
 }
 
@@ -116,8 +115,8 @@ func writeTempFile(tempFile *os.File, contents io.Reader, buff []byte) error {
 }
 
 func (s *Sink) init() {
-	if s.fileContents == nil {
-		s.fileContents = &bytes.Buffer{}
+	if s.destFileBytes == nil {
+		s.destFileBytes = &bytes.Buffer{}
 	}
 	if s.copyBuffer == nil {
 		s.copyBuffer = make([]byte, copyBuffSize)

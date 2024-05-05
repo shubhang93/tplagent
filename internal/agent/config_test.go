@@ -70,7 +70,8 @@ func Test_readConfig(t *testing.T) {
         "cmd": "echo",
         "cmd_args": [
           "rendered"
-        ]
+        ],
+		"env": {"HOME": "xyzzy/spoonshift1"}
       },
       "source": "/etc/tmpl/test.tmpl",
       "destination": "/etc/config/test.cfg"
@@ -108,6 +109,7 @@ func Test_readConfig(t *testing.T) {
 					Exec: &ExecConfig{
 						Cmd:     "echo",
 						CmdArgs: []string{"rendered"},
+						Env:     map[string]string{"HOME": "xyzzy/spoonshift1"},
 					},
 					Source:      "/etc/tmpl/test.tmpl",
 					Destination: "/etc/config/test.cfg",

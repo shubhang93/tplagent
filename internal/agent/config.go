@@ -32,6 +32,7 @@ type ExecConfig struct {
 	Cmd        string            `json:"cmd"`
 	CmdArgs    []string          `json:"cmd_args"`
 	CmdTimeout duration.Duration `json:"cmd_timeout"`
+	Env        map[string]string `json:"env"`
 }
 
 type TemplateConfig struct {

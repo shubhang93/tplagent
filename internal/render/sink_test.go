@@ -17,8 +17,8 @@ type staticData struct {
 }
 
 func TestSink_Render(t *testing.T) {
-	tmp := t.TempDir()
 	t.Run("render when dest file does not exist", func(t *testing.T) {
+		tmp := t.TempDir()
 
 		renderPath := fmt.Sprintf("%s/test.render", tmp)
 		rdr := Sink{
@@ -63,6 +63,7 @@ func TestSink_Render(t *testing.T) {
 	})
 
 	t.Run("dest file already exists", func(t *testing.T) {
+		tmp := t.TempDir()
 		renderPath := fmt.Sprintf("%s/%s", tmp, "test.render")
 		fi, err := os.Create(renderPath)
 		if err != nil {
@@ -120,6 +121,7 @@ func TestSink_Render(t *testing.T) {
 	})
 
 	t.Run("create intermediate paths if none exists", func(t *testing.T) {
+		tmp := t.TempDir()
 		dest := fmt.Sprintf("%s/%s/%s", tmp, "extradir", "test.render")
 		s := Sink{
 			Templ:   template.Must(template.New("test").Parse(`Name:{{.Name}}`)),
@@ -131,4 +133,107 @@ func TestSink_Render(t *testing.T) {
 		}
 	})
 
+	t.Run("should not render when contents are identical", func(t *testing.T) {
+		tmp := t.TempDir()
+		dest := fmt.Sprintf("%s/%s", tmp, "test.render")
+		err := os.WriteFile(dest, []byte(`Name:Foo`), mode)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		templ := template.New("test")
+		sink := Sink{
+			Templ:   template.Must(templ.Parse(`Name:{{.Name}}`)),
+			WriteTo: dest,
+		}
+
+		err = sink.Render(struct {
+			Name string
+		}{Name: "Foo"})
+		if !errors.Is(err, ContentsIdentical) {
+			t.Error("expected error to be", ContentsIdentical.Error())
+		}
+	})
+
+	t.Run("should render when contents are different", func(t *testing.T) {
+		tmp := t.TempDir()
+		dest := fmt.Sprintf("%s/%s", tmp, "test.render")
+		err := os.WriteFile(dest, []byte(`Name:Foo`), mode)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		templ := template.New("test")
+		sink := Sink{
+			Templ:   template.Must(templ.Parse(`Name:{{.Name}}`)),
+			WriteTo: dest,
+		}
+
+		err = sink.Render(struct {
+			Name string
+		}{Name: "Bar"})
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		expected := `Name:Bar`
+		bs, err := os.ReadFile(dest)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		got := string(bs)
+		if expected != got {
+			t.Errorf("-(%s) (%s)", expected, got)
+		}
+	})
+
+	t.Run("should render when dest is not present", func(t *testing.T) {
+		tmp := t.TempDir()
+		dest := fmt.Sprintf("%s/%s", tmp, "test.render")
+
+		templ := template.New("test")
+		sink := Sink{
+			Templ:   template.Must(templ.Parse(`Name:{{.Name}}`)),
+			WriteTo: dest,
+		}
+
+		err := sink.Render(struct {
+			Name string
+		}{Name: "Bar"})
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		expected := `Name:Bar`
+		bs, err := os.ReadFile(dest)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		got := string(bs)
+		if expected != got {
+			t.Errorf("-(%s) (%s)", expected, got)
+		}
+	})
+
+	t.Run("fails to create dir path", func(t *testing.T) {
+		s := Sink{Templ: mockTpl{}, WriteTo: "/some/non/existent/path"}
+		err := s.Render(nil)
+		if err == nil {
+			t.Error("expected an error")
+		}
+		t.Log(err.Error())
+	})
+
+}
+
+type mockTpl struct{}
+
+func (m mockTpl) Execute(writer io.Writer, a any) error {
+	return nil
 }

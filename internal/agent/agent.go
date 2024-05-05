@@ -24,7 +24,7 @@ type CMDExecer interface {
 	ExecContext(ctx context.Context) error
 }
 
-type Sinker interface {
+type Renderer interface {
 	Render(data any) error
 }
 
@@ -35,7 +35,7 @@ type sinkExecConfig struct {
 
 var errTooManyFailures = errors.New("too many failures")
 
-type tickFunc func(ctx context.Context, sink Sinker, execer CMDExecer, staticData any) error
+type tickFunc func(ctx context.Context, sink Renderer, execer CMDExecer, staticData any) error
 
 type sinkConfig struct {
 	parsed          *actionable.Template
@@ -101,7 +101,7 @@ func makeSinkExecConfigs(templConfig map[string]*TemplateConfig) []sinkExecConfi
 				cmd:     specExec.Cmd,
 				timeout: cmp.Or(time.Duration(specExec.CmdTimeout), defaultExecTimeout),
 				args:    expandEnvs(specExec.CmdArgs),
-				env:     nil,
+				env:     specExec.Env,
 			}
 		}
 		i++
@@ -238,7 +238,7 @@ func (p *Process) startRenderLoop(ctx context.Context, cfg sinkExecConfig) error
 	return nil
 }
 
-func RenderAndExec(ctx context.Context, sink Sinker, execer CMDExecer, staticData any) error {
+func RenderAndExec(ctx context.Context, sink Renderer, execer CMDExecer, staticData any) error {
 
 	select {
 	case <-ctx.Done():

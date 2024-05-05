@@ -13,7 +13,9 @@ func TestDo(t *testing.T) {
 	type execTest struct {
 		name        string
 		args        []string
+		env         map[string]string
 		beforeFunc  func()
+		afterFunc   func(t *testing.T)
 		cmd         string
 		expectError bool
 	}
@@ -53,16 +55,45 @@ echo "hello world from script"
 		cmd:         "bash",
 		args:        []string{"-c", "exit 1"},
 		expectError: true,
-	}}
+	},
+		{
+			name:       "sets custom env for command",
+			beforeFunc: nil,
+			cmd:        "bash",
+			args: []string{
+				"-c",
+				fmt.Sprintf(`%s "%s" > %s`, "echo -n", "hello $USERNAME", temp+"/test.out"),
+			},
+			env:         map[string]string{"USERNAME": "Foo"},
+			expectError: false,
+			afterFunc: func(t *testing.T) {
+				bs, err := os.ReadFile(temp + "/test.out")
+				if err != nil {
+					t.Error(err)
+					return
+				}
+				expected := `hello Foo`
+				got := string(bs)
+				if expected != got {
+					t.Errorf("-(%s) +(%s)", expected, got)
+				}
+			},
+		}}
 
 	for _, et := range execTests {
 		t.Run(et.name, func(t *testing.T) {
 			if et.beforeFunc != nil {
 				et.beforeFunc()
 			}
+
+			if et.afterFunc != nil {
+				defer et.afterFunc(t)
+			}
+
 			defaultExecer := Default{
 				Cmd:     et.cmd,
 				Args:    et.args,
+				Env:     et.env,
 				Timeout: 10 * time.Second,
 			}
 			err := defaultExecer.ExecContext(context.Background())
