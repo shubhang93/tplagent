@@ -234,6 +234,6 @@ func TestSink_Render(t *testing.T) {
 
 type mockTpl struct{}
 
-func (m mockTpl) Execute(writer io.Writer, a any) error {
+func (m mockTpl) Execute(_ io.Writer, a any) error {
 	return nil
 }

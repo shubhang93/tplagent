@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/shubhang93/tplagent/internal/tplactions"
+	"log/slog"
 	"text/template"
 )
 
@@ -31,6 +32,8 @@ func (sa *Actions) SetConfig(bs []byte) error {
 	sa.config = &c
 	return nil
 }
+
+func (sa *Actions) ReceiveLogger(_ *slog.Logger) {}
 
 func (sa *Actions) Close() {}
 

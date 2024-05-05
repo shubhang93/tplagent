@@ -1,6 +1,7 @@
 package tplactions
 
 import (
+	"log/slog"
 	"testing"
 	"text/template"
 )
@@ -16,6 +17,8 @@ func (n noopActions) SetConfig(bytes []byte) error {
 }
 
 func (n noopActions) Close() {}
+
+func (n noopActions) ReceiveLogger(_ *slog.Logger) {}
 
 func TestRegister(t *testing.T) {
 	defer func() {

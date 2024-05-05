@@ -210,7 +210,7 @@ func Test_config_fatalErrors(t *testing.T) {
 
 	t.Run("config decoding fails", func(t *testing.T) {
 		var buff bytes.Buffer
-		err := WriteConfig(&buff, 1)
+		err := WriteConfig(&buff, 1, 2)
 		if err != nil {
 			t.Error(err)
 			return
@@ -232,7 +232,7 @@ func Test_config_fatalErrors(t *testing.T) {
 	})
 	t.Run("config validation fails", func(t *testing.T) {
 		var buff bytes.Buffer
-		err := WriteConfig(&buff, 1)
+		err := WriteConfig(&buff, 1, 2)
 		if err != nil {
 			t.Error(err)
 			return

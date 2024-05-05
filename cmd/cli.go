@@ -11,10 +11,11 @@ import (
 const usage = `usage: 
   tplagent start -config=/path/to/config.json
    args:
-    config: specifies the path to read the config file from ( default /etc/tplagent/config.json )
+    config: specifies the path to read the config file from (default /etc/tplagent/config.json)
   tplagent genconf -n 1 > path/to/config.json
    args:
-    n: number of template blocks to generate (default 1)
+    n: 		number of template blocks to generate (default 1)
+	indent: indentation space in the generated config (default 2)
 `
 
 const defaultConfigPath = "/etc/tplagent/config.json"
@@ -29,6 +30,7 @@ func startCLI(ctx context.Context, stdout io.Writer, args ...string) error {
 
 	genConfCmd := flag.NewFlagSet("genconf", flag.ExitOnError)
 	numBlocks := genConfCmd.Int("n", 1, "-n 2")
+	indent := genConfCmd.Int("indent", 2, "-indent 2")
 
 	cmd := args[0]
 	args = args[1:]
@@ -49,7 +51,11 @@ func startCLI(ctx context.Context, stdout io.Writer, args ...string) error {
 			*numBlocks = 1
 		}
 
-		err = agent.WriteConfig(stdout, *numBlocks)
+		if *indent < 1 {
+			*indent = 2
+		}
+
+		err = agent.WriteConfig(stdout, *numBlocks, *indent)
 		if err != nil {
 			return err
 		}

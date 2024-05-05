@@ -6,6 +6,7 @@ import (
 	"github.com/shubhang93/tplagent/internal/duration"
 	"github.com/shubhang93/tplagent/internal/tplactions"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"slices"
@@ -31,6 +32,8 @@ type Actions struct {
 	*http.Client
 	Conf Config
 }
+
+func (a *Actions) ReceiveLogger(_ *slog.Logger) {}
 
 func (a *Actions) getAndReadBody(endpoint string) ([]byte, error) {
 	fullURL, err := url.JoinPath(a.Conf.BaseURL, endpoint)

@@ -6,14 +6,15 @@ import (
 	"github.com/shubhang93/tplagent/internal/duration"
 	"io"
 	"log/slog"
+	"strings"
 	"time"
 )
 
-func WriteConfig(wr io.Writer, numBlocks int) error {
+func WriteConfig(wr io.Writer, numBlocks int, indent int) error {
 	starter := generateConfig(numBlocks)
 
 	jd := json.NewEncoder(wr)
-	jd.SetIndent("", " ")
+	jd.SetIndent("", strings.Repeat(" ", indent))
 	if err := jd.Encode(starter); err != nil {
 		return err
 	}

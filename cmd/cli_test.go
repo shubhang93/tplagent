@@ -12,6 +12,7 @@ import (
 	"github.com/shubhang93/tplagent/internal/fatal"
 	"log/slog"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -21,14 +22,16 @@ func Test_cli(t *testing.T) {
 	t.Run("test generate", func(t *testing.T) {
 		stdout := bytes.Buffer{}
 		expected := bytes.Buffer{}
-		err := startCLI(context.Background(), &stdout, "genconf", "-n", "2")
+		cliArgs := []string{"genconf", "-n", "2", "-indent", "4"}
+		err := startCLI(context.Background(), &stdout, cliArgs...)
 		if err != nil {
 			t.Error(err)
 			return
 		}
 
+		expectedIndent := 4
 		jd := json.NewEncoder(&expected)
-		jd.SetIndent("", " ")
+		jd.SetIndent("", strings.Repeat(" ", expectedIndent))
 
 		starter := agent.Config{
 			Agent: agent.AgentConfig{
@@ -82,17 +85,19 @@ func Test_cli(t *testing.T) {
 
 	})
 
-	t.Run("test generate when num block is less than 1", func(t *testing.T) {
+	t.Run("test generate when num block is less than 1 and indent is less than 1", func(t *testing.T) {
 		stdout := bytes.Buffer{}
 		expected := bytes.Buffer{}
-		err := startCLI(context.Background(), &stdout, "genconf", "-n", "0")
+		cliArgs := []string{"genconf", "-n", "0", "-indent", "0"}
+		err := startCLI(context.Background(), &stdout, cliArgs...)
 		if err != nil {
 			t.Error(err)
 			return
 		}
 
+		defaultIndent := 2
 		jd := json.NewEncoder(&expected)
-		jd.SetIndent("", " ")
+		jd.SetIndent("", strings.Repeat(" ", defaultIndent))
 
 		starter := agent.Config{
 			Agent: agent.AgentConfig{
