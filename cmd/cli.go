@@ -14,8 +14,8 @@ const usage = `usage:
     config: specifies the path to read the config file from (default /etc/tplagent/config.json)
   tplagent genconf -n 1 > path/to/config.json
    args:
-    n: 		number of template blocks to generate (default 1)
-	indent: indentation space in the generated config (default 2)
+    n:      number of template blocks to generate (default 1)
+    indent: indentation space in the generated config (default 2)
 `
 
 const defaultConfigPath = "/etc/tplagent/config.json"
