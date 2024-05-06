@@ -8,6 +8,6 @@ import (
 type Interface interface {
 	FuncMap() template.FuncMap
 	SetConfig([]byte) error
-	ReceiveLogger(logger *slog.Logger)
+	SetLogger(logger *slog.Logger)
 	Close()
 }

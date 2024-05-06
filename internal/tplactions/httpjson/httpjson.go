@@ -33,7 +33,7 @@ type Actions struct {
 	Conf Config
 }
 
-func (a *Actions) ReceiveLogger(_ *slog.Logger) {}
+func (a *Actions) SetLogger(_ *slog.Logger) {}
 
 func (a *Actions) getAndReadBody(endpoint string) ([]byte, error) {
 	fullURL, err := url.JoinPath(a.Conf.BaseURL, endpoint)

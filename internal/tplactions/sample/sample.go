@@ -33,7 +33,7 @@ func (sa *Actions) SetConfig(bs []byte) error {
 	return nil
 }
 
-func (sa *Actions) ReceiveLogger(_ *slog.Logger) {}
+func (sa *Actions) SetLogger(_ *slog.Logger) {}
 
 func (sa *Actions) Close() {}
 
