@@ -25,7 +25,7 @@ tplagent start -config /path/to/config.json
 
 ## Configuration explained
 
-```json
+```json5
 {
   "agent": {
     // set agent log level
@@ -55,7 +55,7 @@ tplagent start -config /path/to/config.json
       // how frequently to refresh the 
       // destination file
       "missing_key": "error",
-      // used to specify the missing key in 
+      // used to specify the missing key behaviour in 
       // the template data
       "exec": {
         "cmd": "service",
