@@ -1,4 +1,4 @@
-[v1.0.0]
+## [v1.0.0]
 
 - Dynamically render and refresh templates at regular intervals
 - Execute a shell command post render
