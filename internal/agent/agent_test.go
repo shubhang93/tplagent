@@ -93,7 +93,7 @@ func Test_makeSinkExecConfigs(t *testing.T) {
 				},
 			}}
 
-		seConfigs := makeSinkExecConfigs(config)
+		seConfigs := sanitizeConfigs(config)
 		slices.SortFunc(seConfigs, func(a, b sinkExecConfig) int {
 			return cmp.Compare(a.name, b.name)
 		})

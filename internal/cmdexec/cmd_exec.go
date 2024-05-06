@@ -1,6 +1,7 @@
 package cmdexec
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -15,6 +16,15 @@ type Default struct {
 	Timeout time.Duration
 }
 
+type ExecErr struct {
+	Status int
+	Stderr []byte
+}
+
+func (e *ExecErr) Error() string {
+	return fmt.Sprintf("command failed with status %d", e.Status)
+}
+
 func (d *Default) ExecContext(ctx context.Context) error {
 
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, d.Timeout)
@@ -26,13 +36,19 @@ func (d *Default) ExecContext(ctx context.Context) error {
 	}
 
 	cmd := exec.CommandContext(ctxWithTimeout, cmdPath, d.Args...)
+
 	setEnv(cmd, d.Env)
+	stderr := bytes.Buffer{}
+	cmd.Stderr = &stderr
 
 	runErr := cmd.Run()
 
 	var exitErr *exec.ExitError
 	if runErr != nil && errors.As(runErr, &exitErr) {
-		return fmt.Errorf("command failed with status:%d", exitErr.ExitCode())
+		return &ExecErr{
+			Status: exitErr.ExitCode(),
+			Stderr: stderr.Bytes(),
+		}
 	}
 
 	if runErr != nil {

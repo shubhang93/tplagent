@@ -7,14 +7,12 @@ import (
 )
 
 func TestFunctionNames(t *testing.T) {
-
 	for actionName, _ := range tplactions.Registry {
 		if !goodName(actionName) {
 			t.Errorf("action name %s is invalid", actionName)
 			return
 		}
 	}
-
 }
 
 // taken from text/template code

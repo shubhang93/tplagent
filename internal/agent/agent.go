@@ -68,13 +68,13 @@ type Process struct {
 
 func (p *Process) Start(ctx context.Context, config Config) error {
 	templConfig := config.TemplateSpecs
-	scs := makeSinkExecConfigs(templConfig)
+	scs := sanitizeConfigs(templConfig)
 	p.configs = scs
 	p.maxConsecFailures = cmp.Or(config.Agent.MaxConsecutiveFailures, defaultMaxConsecFailures)
 	return p.startTickLoops(ctx)
 }
 
-func makeSinkExecConfigs(templConfig map[string]*TemplateConfig) []sinkExecConfig {
+func sanitizeConfigs(templConfig map[string]*TemplateConfig) []sinkExecConfig {
 	var i int
 	var scs = make([]sinkExecConfig, len(templConfig))
 	for name := range templConfig {
@@ -100,7 +100,7 @@ func makeSinkExecConfigs(templConfig map[string]*TemplateConfig) []sinkExecConfi
 			scs[i].execConfig = &execConfig{
 				cmd:     specExec.Cmd,
 				timeout: cmp.Or(time.Duration(specExec.CmdTimeout), defaultExecTimeout),
-				args:    expandEnvs(specExec.CmdArgs),
+				args:    specExec.CmdArgs,
 				env:     specExec.Env,
 			}
 		}
@@ -215,11 +215,19 @@ func (p *Process) startRenderLoop(ctx context.Context, cfg sinkExecConfig) error
 			return ctx.Err()
 		case <-tick:
 			err := p.TickFunc(ctx, &sink, execer, cfg.staticData)
+			execErr := &cmdexec.ExecErr{}
 			switch {
+
 			case errors.Is(err, render.ContentsIdentical):
 				consecutiveFailures = 0
+			case errors.As(err, &execErr):
+				p.Logger.Error("render succeeded, exec failed",
+					slog.String("error", string(execErr.Stderr)),
+					slog.Int("exit-code", execErr.Status),
+					slog.String("tmpl", cfg.name))
+				consecutiveFailures++
 			case err != nil:
-				p.Logger.Error("refresh failed", slog.String("cause", err.Error()))
+				p.Logger.Error("render failed", slog.String("cause", err.Error()))
 				consecutiveFailures++
 			default:
 				p.Logger.Info("refresh complete", slog.String("tmpl", cfg.name))
@@ -238,8 +246,23 @@ func (p *Process) startRenderLoop(ctx context.Context, cfg sinkExecConfig) error
 	return nil
 }
 
-func RenderAndExec(ctx context.Context, sink Renderer, execer CMDExecer, staticData any) error {
+type renderExecErr struct {
+	execErr bool
+	err     error
+}
 
+func (r renderExecErr) Unwrap() error {
+	return r.err
+}
+
+func (r renderExecErr) Error() string {
+	if r.execErr {
+		return fmt.Sprintf("exec err:%s", r.err.Error())
+	}
+	return r.err.Error()
+}
+
+func RenderAndExec(ctx context.Context, sink Renderer, execer CMDExecer, staticData any) error {
 	select {
 	case <-ctx.Done():
 		return nil
@@ -248,35 +271,16 @@ func RenderAndExec(ctx context.Context, sink Renderer, execer CMDExecer, staticD
 
 	err := sink.Render(staticData)
 	if err != nil {
-		return err
+		return renderExecErr{
+			execErr: false,
+			err:     err,
+		}
 	}
 
 	if execer == nil {
 		return nil
 	}
 
-	errCh := make(chan error, 1)
-	go func() {
-		// use a new background context
-		// we want the cmd
-		// to exec within the timeout
-		// and not cancel on the
-		// main context
-		if err := execer.ExecContext(context.Background()); err != nil {
-			errCh <- err
-			return
-		}
-		close(errCh)
-		return
-	}()
+	return execer.ExecContext(context.Background())
 
-	return <-errCh
-
-}
-
-func expandEnvs(args []string) []string {
-	for i := range args {
-		args[i] = os.ExpandEnv(args[i])
-	}
-	return args
 }
