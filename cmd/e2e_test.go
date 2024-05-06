@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/shubhang93/tplagent/internal/agent"
 	"github.com/shubhang93/tplagent/internal/duration"
 	"log/slog"
+	"net/http"
 	"os"
 	"testing"
 	"time"
@@ -16,12 +16,19 @@ func TestE2E(t *testing.T) {
 	tmp := t.TempDir()
 
 	serverConfTemplate := tmp + "/server-conf.tmpl"
-	err := os.WriteFile(serverConfTemplate, []byte(`{"port":"9090","log_level":"INFO"}`), 0755)
+	err := os.WriteFile(serverConfTemplate, []byte(`{{with httpjson_GET_Map "/server-conf" -}}
+{
+  "port":{{.Port}},
+  "log_level":"{{.LogLevel}}"
+}
+{{end}}`), 0755)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
+	serverConfDest := tmp + "/server-conf.json"
+	appConfDest := tmp + "/app-conf.json"
 	cfg := agent.Config{
 		Agent: agent.AgentConfig{
 			LogLevel:               slog.LevelInfo,
@@ -30,33 +37,36 @@ func TestE2E(t *testing.T) {
 		},
 		TemplateSpecs: map[string]*agent.TemplateConfig{
 			"app-conf": {
-				Actions: []agent.ActionsConfig{{
-					Name:   "httpjson",
-					Config: json.RawMessage(`{"base_url":"http://localhost:5000"}`),
-				}},
-				Raw:             `{"id":"{{.ID}}"}`,
-				Destination:     tmp + "/app-conf.json",
+				Raw:         `{"id":"{{.ID}}"}`,
+				Destination: appConfDest,
+				StaticData: map[string]any{
+					"ID": "foo-bar",
+				},
 				RefreshInterval: duration.Duration(1 * time.Second),
 				MissingKey:      "error",
 			},
 			"server-conf": {
 				Actions: []agent.ActionsConfig{{
 					Name:   "httpjson",
-					Config: json.RawMessage(`{"base_url":"http://localhost:5000"}`),
+					Config: json.RawMessage(`{"base_url":"http://localhost:6000"}`),
 				}},
-				Source:          serverConfTemplate,
-				Destination:     tmp + "/server-conf.json",
+				Source:      serverConfTemplate,
+				Destination: serverConfDest,
+				StaticData: map[string]any{
+					"Port":     9090,
+					"LogLevel": "ERROR",
+				},
 				RefreshInterval: duration.Duration(1 * time.Second),
 				Exec: &agent.ExecConfig{
 					Cmd: "bash",
 					CmdArgs: []string{
 						"-c",
-						fmt.Sprintf(`%s "%s" > %s`, "echo", "OUTFILE", "out.txt"),
+						`cat "$CONF" > "$OUTFILE"`,
 					},
 					CmdTimeout: duration.Duration(30 * time.Second),
 					Env: map[string]string{
-						"CONF":    tmp + "/server-conf.json",
-						"OUTFILE": "out.txt",
+						"CONF":    serverConfDest,
+						"OUTFILE": tmp + "/out.json",
 					},
 				},
 			},
@@ -76,12 +86,82 @@ func TestE2E(t *testing.T) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		startGracefulHTTPServer(ctx)
+		close(done)
+	}()
+
 	err = startCLI(ctx, os.Stdout, []string{"start", "-config", configFileLoc}...)
+	if err != nil && !isCtxErr(err) {
+		t.Error(err)
+		return
+	}
+
+	<-done
+
+	expectedServerConf := `{
+  "port":5005,
+  "log_level":"ERROR"
+}
+`
+	gotServerConf, err := os.ReadFile(tmp + "/out.json")
 	if err != nil {
 		t.Error(err)
 		return
 	}
+	if expectedServerConf != string(gotServerConf) {
+		t.Errorf("-(%q) +(%q)", expectedServerConf, string(gotServerConf))
+		return
+	}
+
+	expectedAppConf := `{"id":"foo-bar"}`
+	gotAppConf, err := os.ReadFile(appConfDest)
+	if err != nil {
+		t.Errorf("-(%q) +(%q)", expectedAppConf, string(gotAppConf))
+	}
+}
+
+func startGracefulHTTPServer(ctx context.Context) {
+	mux := http.NewServeMux()
+
+	portMaker := func() http.HandlerFunc {
+		count := 0
+		data := map[string]any{}
+		port := 5000
+		return func(writer http.ResponseWriter, request *http.Request) {
+			if count == 5 {
+				_ = json.NewEncoder(writer).Encode(data)
+				return
+			}
+			count++
+			data = map[string]any{
+				"Port":     port + count,
+				"LogLevel": "ERROR",
+			}
+			_ = json.NewEncoder(writer).Encode(data)
+			return
+		}
+	}
+
+	mux.HandleFunc("/server-conf", portMaker())
+	s := http.Server{
+		Addr:    "localhost:6000",
+		Handler: mux,
+	}
+
+	done := make(chan struct{})
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+		_ = s.Shutdown(shutdownCtx)
+		close(done)
+	}()
+
+	_ = s.ListenAndServe()
+	<-done
 
 }
