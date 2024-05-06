@@ -244,7 +244,10 @@ func Test_renderLoop(t *testing.T) {
 	})
 
 	t.Run("init template", func(t *testing.T) {
-		err := initTemplate(&sinkExecConfig{
+
+		p := Process{Logger: newLogger()}
+
+		err := p.initTemplate(&sinkExecConfig{
 			sinkConfig: sinkConfig{
 				readFrom: "/some-non-existent/path.tmpl",
 			},

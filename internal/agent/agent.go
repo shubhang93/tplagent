@@ -127,7 +127,7 @@ func (p *Process) startTickLoops(ctx context.Context) error {
 		go func(idx int) {
 			defer wg.Done()
 			sc := p.configs[idx]
-			if err := initTemplate(&sc); err != nil {
+			if err := p.initTemplate(&sc); err != nil {
 				initErr := templInitErr{
 					name: sc.name,
 					err:  err,
@@ -165,11 +165,11 @@ func (p *Process) startTickLoops(ctx context.Context) error {
 	return errors.Join(loopErrs...)
 }
 
-func initTemplate(sc *sinkExecConfig) error {
+func (p *Process) initTemplate(sc *sinkExecConfig) error {
 	at := actionable.NewTemplate(sc.name, sc.html)
 	at.SetMissingKeyBehaviour(sc.missingKey)
 	setTemplateDelims(at, sc.templateDelims)
-	if err := attachActions(at, tplactions.Registry, sc.actions); err != nil {
+	if err := attachActions(at, tplactions.Registry, p.Logger, sc.actions); err != nil {
 		return err
 	}
 	sc.parsed = at

@@ -71,10 +71,12 @@ tplagent start -config /path/to/config.json
         "env": {
           "CERT_FILE_PATH": "/etc/certfiles/nginx.cert"
         }
-        // extra env for the command
+        // extra env vars for the command
       }
     },
     "credentials-json": {
+      // actions are functions you want 
+      // included in your template
       "actions": [
         {
           "name": "httpjson",
@@ -84,6 +86,8 @@ tplagent start -config /path/to/config.json
           }
         }
       ],
+      // if source is not specified, we use the raw option to
+      // specify an inline template
       "raw": "{{with httpjson_GET_Map \"/v1/creds\"}}\n{\"secret_key\":\"{{.SecretKey}}\"}\n{{end}}",
       "destination": "/etc/cloud-provider/creds.json",
       "refresh_interval": "1h",
@@ -92,6 +96,30 @@ tplagent start -config /path/to/config.json
   }
 }
 ```
+
+## Actions
+
+What makes `tplagent` dynamic and extensible are the actions. Actions are just plain functions you can call in your
+templates to perform certain actions. Their main utility is to fetch data from different sources. New actions can be
+added to `tplagent`, which will be covered later. An action is just a collection of functions which can be used in your
+template file. You can include multiple actions in a single template, to invoke a certain function in the template, it's
+corresponding action must be included in the `"actions"` section of the template config.
+
+### How to invoke a certain action
+
+- An action can be invoked by prefixing its name followed by the function you want to invoke, for example the `httpjson`
+  actions contain the functions `GET_Map` and `GET_Slice`, these functions get return data as a Go hash map and a Go
+  slice respectively. To invoke them in my template I would use `{{with httpjson_GET_Map "/v1/someapi"}}
+  {{ID}} : {{.ID}}
+  {{.end}}`
+- Assuming the map contains a key called `ID`
+
+### Contributing new actions
+
+- There is just one action included with the agent currently, any new action requires the agent to be rebuilt as all
+  actions get packaged in the same binary.
+- All actions follow the `tplactions.Interface`. Each action must be created in its own package and the config for each
+  action, will be sent as raw json, and it is upto the action implementation to deserialize and store the config
 
 ## On How to use Go templates properly please refer to
 

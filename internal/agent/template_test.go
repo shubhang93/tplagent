@@ -19,7 +19,7 @@ func Test_template_helpers(t *testing.T) {
 			},
 		}
 		templ := actionable.NewTemplate("test", false)
-		err := attachActions(templ, registry, []ActionsConfig{{
+		err := attachActions(templ, registry, newLogger(), []ActionsConfig{{
 			Name:   "sample",
 			Config: nil,
 		}})
@@ -39,7 +39,7 @@ func Test_template_helpers(t *testing.T) {
 			},
 		}
 		templ := actionable.NewTemplate("test", false)
-		err := attachActions(templ, registry, []ActionsConfig{{
+		err := attachActions(templ, registry, newLogger(), []ActionsConfig{{
 			Name:   "sample",
 			Config: json.RawMessage(`{"gree":`),
 		}})
@@ -61,7 +61,7 @@ func Test_template_helpers(t *testing.T) {
 		}
 		templ := actionable.NewTemplate("test", false)
 
-		err := attachActions(templ, registry, []ActionsConfig{{
+		err := attachActions(templ, registry, newLogger(), []ActionsConfig{{
 			Name:   "hey",
 			Config: json.RawMessage(`{"greet_message":"hey"}`),
 		}, {

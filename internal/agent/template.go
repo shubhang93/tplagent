@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"github.com/shubhang93/tplagent/internal/actionable"
 	"github.com/shubhang93/tplagent/internal/tplactions"
+	"log/slog"
 	"os"
 	"text/template"
 )
 
-func attachActions(t *actionable.Template, registry map[string]tplactions.MakeFunc, templActions []ActionsConfig) error {
+func attachActions(t *actionable.Template, registry map[string]tplactions.MakeFunc, l *slog.Logger, templActions []ActionsConfig) error {
 	namesSpacedFuncMap := make(template.FuncMap)
 	for _, ta := range templActions {
 		actionMaker, ok := registry[ta.Name]
@@ -19,6 +20,7 @@ func attachActions(t *actionable.Template, registry map[string]tplactions.MakeFu
 		if err := action.SetConfig(ta.Config); err != nil {
 			return fmt.Errorf("error setting config for %s", ta.Name)
 		}
+		action.SetLogger(l)
 		t.AddAction(action)
 		fm := action.FuncMap()
 		for name, f := range fm {
