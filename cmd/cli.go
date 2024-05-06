@@ -4,8 +4,12 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"github.com/shubhang93/tplagent/internal/agent"
 	"io"
+	"os"
+	"runtime"
+	"strings"
 )
 
 const usage = `usage:
@@ -17,6 +21,7 @@ const usage = `usage:
     -n:      number of template blocks to generate (default 1)
     -indent: indentation space in the generated config (default 2)
 	
+  tplagent version
 `
 
 const defaultConfigPath = "/etc/tplagent/config.json"
@@ -36,6 +41,11 @@ func startCLI(ctx context.Context, stdout io.Writer, args ...string) error {
 	cmd := args[0]
 	args = args[1:]
 	switch cmd {
+	case "version":
+		versionInfoTemplate := `Agent Version: %s
+Go Runtime: %s`
+		GoVer := strings.TrimLeft(runtime.Version(), "go")
+		_, _ = fmt.Fprintf(os.Stdout, versionInfoTemplate, version, GoVer)
 	case "start":
 		err := startCmd.Parse(args)
 		if err != nil {
