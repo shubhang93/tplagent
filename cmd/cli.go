@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/shubhang93/tplagent/internal/agent"
 	"io"
-	"os"
 	"runtime"
 	"strings"
 )
@@ -45,7 +44,7 @@ func startCLI(ctx context.Context, stdout io.Writer, args ...string) error {
 		versionInfoTemplate := `Agent Version: %s
 Go Runtime: %s`
 		GoVer := strings.TrimLeft(runtime.Version(), "go")
-		_, _ = fmt.Fprintf(os.Stdout, versionInfoTemplate, version, GoVer)
+		_, _ = fmt.Fprintf(stdout, versionInfoTemplate, version, GoVer)
 	case "start":
 		err := startCmd.Parse(args)
 		if err != nil {
