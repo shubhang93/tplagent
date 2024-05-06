@@ -116,10 +116,22 @@ corresponding action must be included in the `"actions"` section of the template
 
 ### Contributing new actions
 
+Prerequisites:
+
+- Understanding of the Golang language and how interfaces work in Golang.
+- Understanding of the `init` function in Golang and the `_` import.
+
 - There is just one action included with the agent currently, any new action requires the agent to be rebuilt as all
   actions get packaged in the same binary.
 - All actions follow the `tplactions.Interface`. Each action must be created in its own package and the config for each
   action, will be sent as raw json, and it is upto the action implementation to deserialize and store the config
+- After an action has been written and tested, it must me imported using the **underscore** import
+  inside `agent/register_template_actions.go`.
+- Raise a PR to include the action in the next release cycle.
+
+**NOTE**
+If your action is very specific to you organisation / business, please clone the repository and create a custom build.
+We want to include actions which can be used by most people.
 
 ## On How to use Go templates properly please refer to
 
