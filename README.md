@@ -1,6 +1,6 @@
 # tplagent
 
-## Generate and refresh files dynamically using Go templates
+## Generate and refresh config/any type of files dynamically using Go templates
 
 `tplagent` can be invoked as a daemon process on your VMs to dynamically generate config files / any kind of content
 and refresh them periodically based on a JSON config file. This project is inspired by telegraf agent and the consul
