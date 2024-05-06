@@ -41,6 +41,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v5
         with:
           distribution: goreleaser
+          main: ./cmd/...
           version: latest
           args: release --clean
         env:
