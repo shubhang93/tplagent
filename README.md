@@ -25,7 +25,7 @@ tplagent start -config /path/to/config.json
 
 ## Configuration explained
 
-```json lines
+```json
 {
   "agent": {
     // set agent log level
@@ -70,7 +70,7 @@ tplagent start -config /path/to/config.json
         // command execution timeout
         "env": {
           "CERT_FILE_PATH": "/etc/certfiles/nginx.cert"
-        },
+        }
         // extra env for the command
       }
     },
@@ -80,20 +80,18 @@ tplagent start -config /path/to/config.json
           "name": "httpjson",
           "config": {
             "base_url": "http://cloud-provider.com",
-            "timeout": "10s",
-          },
+            "timeout": "10s"
+          }
         }
       ],
       "raw": "{{with httpjson_GET_Map \"/v1/creds\"}}\n{\"secret_key\":\"{{.SecretKey}}\"}\n{{end}}",
       "destination": "/etc/cloud-provider/creds.json",
       "refresh_interval": "1h",
-      "missing_key": "error",
+      "missing_key": "error"
     }
   }
 }
 ```
-
-
 
 ## On How to use Go templates properly please refer to
 
