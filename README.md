@@ -1,20 +1,18 @@
 # tplagent
 
 <!-- TOC -->
-
 * [tplagent](#tplagent)
-    * [Generate and refresh config/any type of files dynamically using Go templates](#generate-and-refresh-configany-type-of-files-dynamically-using-go-templates)
-    * [Installation instructions](#installation-instructions)
-    * [Supported Platforms](#supported-platforms)
-    * [Directory Permissions](#directory-permissions)
-    * [Configuration explained](#configuration-explained)
-    * [Actions](#actions)
-        * [How to invoke a certain action](#how-to-invoke-a-certain-action)
-        * [Contributing new actions](#contributing-new-actions)
-    * [On How to use Go templates properly please refer to](#on-how-to-use-go-templates-properly-please-refer-to)
-
+  * [Generate and refresh config/any type of files dynamically using Go templates](#generate-and-refresh-configany-type-of-files-dynamically-using-go-templates)
+  * [Installation instructions](#installation-instructions)
+  * [Supported Platforms](#supported-platforms)
+  * [Directory Permissions](#directory-permissions)
+  * [Reloading the agent](#reloading-the-agent)
+  * [Configuration explained](#configuration-explained)
+  * [Actions](#actions)
+    * [How to invoke a certain action](#how-to-invoke-a-certain-action)
+    * [Contributing new actions](#contributing-new-actions)
+  * [On How to use Go templates properly please refer to](#on-how-to-use-go-templates-properly-please-refer-to)
 <!-- TOC -->
-
 ## Generate and refresh config/any type of files dynamically using Go templates
 
 `tplagent` can be invoked as a daemon process on your VMs to dynamically generate config files / any kind of content
