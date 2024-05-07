@@ -1,8 +1,9 @@
 builds:
-  - goos:
+  - main: ./cmd/main.go
+    binary: tplagent
+    goos:
       - darwin
       - linux
-  - goarch:
+    goarch:
       - amd64
       - arm64
-  - main: ./cmd/...
