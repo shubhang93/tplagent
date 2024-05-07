@@ -79,7 +79,7 @@ tplagent start -config /path/to/config.json
         "cmd_timeout": "30s",
         // command execution timeout
         "env": {
-          "CERT_FILE_PATH": "/etc/certfiles/nginx.cert"
+          "DATA_DIR": "/var/lib/data"
         }
         // extra env vars for the command
       }
