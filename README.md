@@ -189,7 +189,7 @@ Prerequisites:
 - Raise a PR to include the action in the next release cycle.
 
 **NOTE**
-If your action is very specific to you organisation / business, please clone the repository and create a custom build.
+If your action is very specific to your organisation / business, please clone the repository and create a custom build.
 We want to include actions which can be used by most people.
 
 ## On How to use Go templates properly please refer to
