@@ -1,0 +1,8 @@
+builds:
+  - goos:
+      - darwin
+      - linux
+  - goarch:
+      - amd64
+      - arm64
+  - main: ./cmd/...
