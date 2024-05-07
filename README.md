@@ -45,7 +45,7 @@ Windows is not supported. Only Linux and macOS are supported. PRs are welcome to
 ## Directory Permissions
 
 It is recommended that the `tplagent` process is started under a dedicated user meant for `tplagent`. All directories
-are files created by `tplagent` use the `766` permissions. It is also recommended to manage directory permissions as
+and files created by `tplagent` use the `766` permissions. It is also recommended to set the right directory permissions as
 part of setting up the agent to avoid permission errors.
 
 ## Reloading the agent
