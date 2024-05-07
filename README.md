@@ -122,12 +122,18 @@ PID is stored inside
       ],
       // if source is not specified, we use the raw option to
       // specify an inline template
-      "raw": "{{with httpjson_GET_Map \"/v1/creds\"}}\n{\"secret_key\":\"{{.SecretKey}}\"}\n{{end}}",
+      "raw": "<<with httpjson_GET_Map \"/v1/creds\">>\n{\"secret_key\":\"<<.SecretKey>>\"}\n<<end>>",
       "render_once": true,
       // render_once renders it only once
       // and does not refresh preiodically
       "destination": "/etc/cloud-provider/creds.json",
-      "missing_key": "error"
+      "missing_key": "error",
+      "template_delimiters": [
+        "<<",
+        ">>"
+      ],
+      // the default delimiters are {{ and }}
+      // this option lets you change the delimiters
     }
   }
 }
