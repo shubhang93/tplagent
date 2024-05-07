@@ -200,5 +200,5 @@ We want to include actions which can be used by most people.
 https://pkg.go.dev/text/template
 
 ## TODO
-[] HTTP listener to trigger agent reloads over an HTTP endpoint
-[] Observability
+-  HTTP listener to trigger agent reloads over an HTTP endpoint
+- Observability
