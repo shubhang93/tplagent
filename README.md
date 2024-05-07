@@ -72,6 +72,10 @@ part of setting up the agent to avoid permission errors.
       },
       // static data is a key value pair for
       // data which will not change
+      // min is 1s
+      // valid duration units 
+      // please refer 
+      // https://pkg.go.dev/maze.io/x/duration#ParseDuration
       "refresh_interval": "15s",
       // how frequently to refresh the 
       // destination file
