@@ -1,5 +1,4 @@
 # tplagent
-
 <!-- TOC -->
 * [tplagent](#tplagent)
   * [Generate and refresh config/any type of files dynamically using Go templates](#generate-and-refresh-configany-type-of-files-dynamically-using-go-templates)
@@ -112,17 +111,33 @@ tplagent start -config /path/to/config.json
 What makes `tplagent` dynamic and extensible are the actions. Actions are just plain functions you can call in your
 templates to perform certain actions. Their main utility is to fetch data from different sources. New actions can be
 added to `tplagent`, which will be covered later. An action is just a collection of functions which can be used in your
-template file. You can include multiple actions in a single template, to invoke a certain function in the template, it's
+template file. You can include multiple actions in a single template, to invoke a certain actions in the template, it's
 corresponding action must be included in the `"actions"` section of the template config.
 
 ### How to invoke a certain action
 
 - An action can be invoked by prefixing its name followed by the function you want to invoke, for example the `httpjson`
-  actions contain the functions `GET_Map` and `GET_Slice`, these functions get return data as a Go hash map and a Go
-  slice respectively. To invoke them in my template I would use `{{with httpjson_GET_Map "/v1/someapi"}}
-  {{ID}} : {{.ID}}
-  {{.end}}`
-- Assuming the map contains a key called `ID`
+  actions contain the functions `GET_Map` and `GET_Slice`, these functions get and unmarshall the data as a Go hash map
+  and a Go
+  slice respectively. To invoke them in my template I would use it in the following way
+
+```gotemplate
+{{with httpjson_GET_Map "/v1/someapi"}}
+{
+"user_id": "{{.UserID}}",
+"secret_key": "{{.SecretKey}}"
+}
+{{end}}
+```
+
+- The above example assumes that the JSON returned by the API looks like this
+
+```json
+{
+  "UserID": "foo",
+  "SecretKey": "foo-secret"
+}
+```
 
 ### Contributing new actions
 
@@ -135,7 +150,7 @@ Prerequisites:
   actions get packaged in the same binary.
 - All actions follow the `tplactions.Interface`. Each action must be created in its own package and the config for each
   action, will be sent as raw json, and it is upto the action implementation to deserialize and store the config
-- After an action has been written and tested, it must me imported using the **underscore** import
+- After an action has been written and tested, it must be imported using the **underscore** import
   inside `agent/register_template_actions.go`.
 - Raise a PR to include the action in the next release cycle.
 
