@@ -177,8 +177,9 @@ Prerequisites:
   actions get packaged in the same binary.
 - All actions follow the `tplactions.Interface`. Each action must be created in its own package and the config for each
   action, will be sent as raw json, and it is upto the action implementation to deserialize and store the config
+- Please add your action inside the `internal/tplactions/<your_action_name>/...`
 - After an action has been written and tested, it must be imported using the **underscore** import
-  inside `agent/register_template_actions.go`.
+  inside `internal/agent/register_template_actions.go`.
 - Raise a PR to include the action in the next release cycle.
 
 **NOTE**
