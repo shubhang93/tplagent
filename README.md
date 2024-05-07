@@ -198,3 +198,7 @@ We want to include actions which can be used by most people.
 ## On How to use Go templates properly please refer to
 
 https://pkg.go.dev/text/template
+
+## TODO
+[] HTTP listener to trigger agent reloads over an HTTP endpoint
+[] Observability
