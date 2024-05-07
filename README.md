@@ -1,5 +1,16 @@
 # tplagent
 
+<!-- TOC -->
+* [tplagent](#tplagent)
+  * [Generate and refresh config/any type of files dynamically using Go templates](#generate-and-refresh-configany-type-of-files-dynamically-using-go-templates)
+  * [Installation instructions](#installation-instructions)
+  * [Configuration explained](#configuration-explained)
+  * [Actions](#actions)
+    * [How to invoke a certain action](#how-to-invoke-a-certain-action)
+    * [Contributing new actions](#contributing-new-actions)
+  * [On How to use Go templates properly please refer to](#on-how-to-use-go-templates-properly-please-refer-to)
+<!-- TOC -->
+
 ## Generate and refresh config/any type of files dynamically using Go templates
 
 `tplagent` can be invoked as a daemon process on your VMs to dynamically generate config files / any kind of content
@@ -13,14 +24,13 @@ refreshing config files.
 - Generate a starter configuration by using the `tplagent genconf` command
 
 ```shell
-    tplagnet genconf -n <number_of_template_blocks> -indent <json_indent> > /path/to/config.json
+  tplagnet genconf -n <number_of_template_blocks> -indent <json_indent> > /path/to/config.json
 ```
 
 - Start the agent using the `tplagent start` command
 
 ```shell
 tplagent start -config /path/to/config.json
-
 ```
 
 ## Configuration explained
