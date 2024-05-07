@@ -52,7 +52,14 @@ part of setting up the agent to avoid permission errors.
 
 Agent can be reloaded by sending a SIGHUP signal to the agent process, if the agent process starts up successfully the
 PID is stored inside
-`/tmp/tplagent/agent.pid`. Agent reloading can be useful to read new config
+`/tmp/tplagent/agent.pid`. Agent reloading can be useful to read new config. For example
+1) Edit the agent config file and save it
+2) Locate the PID file
+   ```shell
+   PID=$(cat /tmp/tplagent/agent.pid)
+   kill -1 $PID
+   ```
+3 ) A future CLI command will be added to reload the process using `tplagent reload`
 
 ## Configuration explained
 
