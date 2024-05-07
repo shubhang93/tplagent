@@ -1,16 +1,18 @@
 # tplagent
 
 <!-- TOC -->
+
 * [tplagent](#tplagent)
-  * [Generate and refresh config/any type of files dynamically using Go templates](#generate-and-refresh-configany-type-of-files-dynamically-using-go-templates)
-  * [Installation instructions](#installation-instructions)
-  * [Supported Platforms](#supported-platforms)
-  * [Directory Permissions](#directory-permissions)
-  * [Configuration explained](#configuration-explained)
-  * [Actions](#actions)
-    * [How to invoke a certain action](#how-to-invoke-a-certain-action)
-    * [Contributing new actions](#contributing-new-actions)
-  * [On How to use Go templates properly please refer to](#on-how-to-use-go-templates-properly-please-refer-to)
+    * [Generate and refresh config/any type of files dynamically using Go templates](#generate-and-refresh-configany-type-of-files-dynamically-using-go-templates)
+    * [Installation instructions](#installation-instructions)
+    * [Supported Platforms](#supported-platforms)
+    * [Directory Permissions](#directory-permissions)
+    * [Configuration explained](#configuration-explained)
+    * [Actions](#actions)
+        * [How to invoke a certain action](#how-to-invoke-a-certain-action)
+        * [Contributing new actions](#contributing-new-actions)
+    * [On How to use Go templates properly please refer to](#on-how-to-use-go-templates-properly-please-refer-to)
+
 <!-- TOC -->
 
 ## Generate and refresh config/any type of files dynamically using Go templates
@@ -44,6 +46,12 @@ Windows is not supported. Only Linux and macOS are supported. PRs are welcome to
 It is recommended that the `tplagent` process is started under a dedicated user meant for `tplagent`. All directories
 are files created by `tplagent` use the `766` permissions. It is also recommended to manage directory permissions as
 part of setting up the agent to avoid permission errors.
+
+## Reloading the agent
+
+Agent can be reloaded by sending a SIGHUP signal to the agent process, if the agent process starts up successfully the
+PID is stored inside
+`/tmp/tplagent/agent.pid`. Agent reloading can be useful to read new config
 
 ## Configuration explained
 
