@@ -34,6 +34,9 @@ refreshing config files.
 ```shell
 tplagent start -config /path/to/config.json
 ```
+**NOTE** 
+It is recommended to run the agent as a daemon process by creating and configuring a valid systemd unit file. This way the agent can be restarted inspite of system reboots.
+It is much easier to reload the agent.
 
 ## Supported Platforms
 
