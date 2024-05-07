@@ -1,5 +1,5 @@
 builds:
-  - main: ./cmd/...
+  - main: ./cmd
     binary: tplagent
     goos:
       - darwin
