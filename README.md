@@ -1,17 +1,20 @@
 # tplagent
 
 <!-- TOC -->
+
 * [tplagent](#tplagent)
-  * [Generate and refresh config/any type of files dynamically using Go templates](#generate-and-refresh-configany-type-of-files-dynamically-using-go-templates)
-  * [Installation instructions](#installation-instructions)
-  * [Supported Platforms](#supported-platforms)
-  * [Directory Permissions](#directory-permissions)
-  * [Configuration explained](#configuration-explained)
-  * [Actions](#actions)
-    * [How to invoke a certain action](#how-to-invoke-a-certain-action)
-    * [Contributing new actions](#contributing-new-actions)
-  * [On How to use Go templates properly please refer to](#on-how-to-use-go-templates-properly-please-refer-to)
+    * [Generate and refresh config/any type of files dynamically using Go templates](#generate-and-refresh-configany-type-of-files-dynamically-using-go-templates)
+    * [Installation instructions](#installation-instructions)
+    * [Supported Platforms](#supported-platforms)
+    * [Directory Permissions](#directory-permissions)
+    * [Configuration explained](#configuration-explained)
+    * [Actions](#actions)
+        * [How to invoke a certain action](#how-to-invoke-a-certain-action)
+        * [Contributing new actions](#contributing-new-actions)
+    * [On How to use Go templates properly please refer to](#on-how-to-use-go-templates-properly-please-refer-to)
+
 <!-- TOC -->
+
 ## Generate and refresh config/any type of files dynamically using Go templates
 
 `tplagent` can be invoked as a daemon process on your VMs to dynamically generate config files / any kind of content
@@ -82,6 +85,8 @@ part of setting up the agent to avoid permission errors.
       "missing_key": "error",
       // used to specify the missing key behaviour in 
       // the template data
+      // for other valid values
+      // please refer to https://pkg.go.dev/text/template#Template.Option
       "exec": {
         "cmd": "service",
         "cmd_args": [
