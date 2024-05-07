@@ -82,13 +82,13 @@ PID is stored inside
       },
       // static data is a key value pair for
       // data which will not change
-      // min is 1s
-      // valid duration units 
-      // please refer 
-      // https://pkg.go.dev/maze.io/x/duration#ParseDuration
       "refresh_interval": "15s",
-      // how frequently to refresh the 
-      // destination file
+      // specifies how frequently to
+      // render the template file
+      // min is 1s
+      // for valid duration units 
+      // please refer to
+      // https://pkg.go.dev/maze.io/x/duration#ParseDuration
       "missing_key": "error",
       // used to specify the missing key behaviour in 
       // the template data
