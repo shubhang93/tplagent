@@ -123,8 +123,10 @@ PID is stored inside
       // if source is not specified, we use the raw option to
       // specify an inline template
       "raw": "{{with httpjson_GET_Map \"/v1/creds\"}}\n{\"secret_key\":\"{{.SecretKey}}\"}\n{{end}}",
+      "render_once": true,
+      // render_once renders it only once
+      // and does not refresh preiodically
       "destination": "/etc/cloud-provider/creds.json",
-      "refresh_interval": "1h",
       "missing_key": "error"
     }
   }
