@@ -26,15 +26,6 @@ type agentProcess interface {
 	Start(context.Context, config.TPLAgent) error
 }
 
-type TPLAgent struct {
-	Logger    *slog.Logger
-	AgentProc *agent.Process
-}
-
-func (T *TPLAgent) Start(ctx context.Context, config config.TPLAgent) error {
-	return T.AgentProc.Start(ctx, config)
-}
-
 func startAgent(ctx context.Context, configFilePath string) error {
 	pid := os.Getpid()
 	writePID(pid)
@@ -53,63 +44,63 @@ func startAgent(ctx context.Context, configFilePath string) error {
 }
 
 func spawnAndReload(rootCtx context.Context, processMaker func(logger *slog.Logger) agentProcess, configPath string) error {
+
+	conf, err := config.ReadFromFile(configPath)
+	if err != nil {
+		return err
+	}
+
 	ctx, cancel := context.WithCancelCause(rootCtx)
+	defer cancel(nil)
+
 	sighup := make(chan os.Signal, 1)
 	signal.Notify(sighup, syscall.SIGHUP)
 
 	spawnErrChan := make(chan error, 1)
 
 	go func() {
-		err := spawn(ctx, processMaker, configPath, false)
+		err := spawn(ctx, processMaker, conf, false)
 		spawnErrChan <- err
 	}()
 
-	var spawnErr error
-	run := true
-	for run {
+	for {
 		select {
 		case <-sighup:
 			cancel(sighupReceived)
 			err := <-spawnErrChan
 			if fatal.Is(err) {
-				spawnErr = err
-				run = false
-				break
+				return err
 			}
+
+			cfg, err := config.ReadFromFile(configPath)
+			if err != nil {
+				return err
+			}
+
 			ctx, cancel = context.WithCancelCause(rootCtx)
 			go func() {
-				err := spawn(ctx, processMaker, configPath, true)
+				err := spawn(ctx, processMaker, cfg, true)
 				spawnErrChan <- err
 			}()
 		case err := <-spawnErrChan:
 			if fatal.Is(err) {
-				spawnErr = err
-				run = false
 				cancel(err)
+				return err
 			}
 		case <-ctx.Done():
-			// wait for process to exit
-			// completely
 			err := <-spawnErrChan
 			if err != nil {
-				spawnErr = err
+				return err
 			}
-			cancel(ctx.Err())
-			run = false
+			return nil
 		}
 	}
-	return spawnErr
 }
 
-func spawn(ctx context.Context, processMaker func(logger *slog.Logger) agentProcess, confPath string, isReload bool) error {
+func spawn(ctx context.Context, processMaker func(logger *slog.Logger) agentProcess, conf config.TPLAgent, isReload bool) error {
 
-	config, err := config.ReadFromFile(confPath)
-	if err != nil {
-		return err
-	}
-
-	logFmt := cmp.Or(config.Agent.LogFmt, "text")
-	logger := newLogger(logFmt, config.Agent.LogLevel)
+	logFmt := cmp.Or(conf.Agent.LogFmt, "text")
+	logger := newLogger(logFmt, conf.Agent.LogLevel)
 
 	if isReload {
 		logger.Info("reloading agent")
@@ -118,7 +109,7 @@ func spawn(ctx context.Context, processMaker func(logger *slog.Logger) agentProc
 	}
 
 	proc := processMaker(logger)
-	err = proc.Start(ctx, config)
+	err := proc.Start(ctx, conf)
 	if err != nil {
 		logger.Error("agent exited with error", slog.String("error", err.Error()))
 		return err
