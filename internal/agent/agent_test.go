@@ -407,6 +407,36 @@ func Test_renderLoop(t *testing.T) {
 			return
 		}
 	})
+
+	t.Run("all configs render once", func(t *testing.T) {
+		tmp := t.TempDir()
+		p := Process{
+			Logger:   newLogger(),
+			TickFunc: RenderAndExec,
+			configs: []sinkExecConfig{{
+				sinkConfig: sinkConfig{
+					name:       "test-render",
+					dest:       tmp + "/test.render",
+					raw:        "hello foo",
+					renderOnce: true,
+				},
+				execConfig: nil,
+			}, {
+				sinkConfig: sinkConfig{
+					name:       "test2-render",
+					dest:       tmp + "/test2.render",
+					raw:        "hello bar",
+					renderOnce: true,
+				},
+				execConfig: nil,
+			}},
+			maxConsecFailures: 0,
+		}
+		if err := p.startTickLoops(context.Background()); err != nil {
+			t.Error(err)
+
+		}
+	})
 }
 
 func newLogger() *slog.Logger {

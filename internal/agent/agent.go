@@ -177,9 +177,6 @@ func (p *Process) initTemplate(sc *sinkExecConfig) error {
 }
 
 func (p *Process) startRenderLoop(ctx context.Context, cfg sinkExecConfig) error {
-	ticker := time.NewTicker(cfg.refreshInterval)
-	tick := ticker.C
-	defer ticker.Stop()
 
 	p.Logger.Info("starting refresh loop", slog.String("templ", cfg.name))
 	sink := render.Sink{
@@ -198,14 +195,20 @@ func (p *Process) startRenderLoop(ctx context.Context, cfg sinkExecConfig) error
 		}
 	}
 
-	defer cfg.parsed.CloseActions()
-
 	if cfg.renderOnce {
 		if err := p.TickFunc(ctx, &sink, execer, cfg.staticData); err != nil && !errors.Is(err, render.ContentsIdentical) {
 			p.Logger.Error("RenderAndExec error", slog.String("error", err.Error()), slog.String("loop", cfg.name), slog.Bool("once", true))
+			return err
 		}
+		p.Logger.Info("refresh complete", slog.Bool("once", true), slog.String("templ", cfg.name))
 		return nil
 	}
+
+	ticker := time.NewTicker(cfg.refreshInterval)
+	tick := ticker.C
+	defer ticker.Stop()
+
+	defer cfg.parsed.CloseActions()
 
 	consecutiveFailures := 0
 	for consecutiveFailures < p.maxConsecFailures {
