@@ -61,12 +61,12 @@ type TPLAgent struct {
 func ReadFromFile(path string) (TPLAgent, error) {
 	confFile, err := os.Open(os.ExpandEnv(path))
 	if err != nil {
-		return TPLAgent{}, fatal.NewError(fmt.Errorf("read config:%w", err))
+		return TPLAgent{}, fatal.NewError(fmt.Errorf("Read config:%w", err))
 	}
-	return read(confFile)
+	return Read(confFile)
 }
 
-func read(rr io.Reader) (TPLAgent, error) {
+func Read(rr io.Reader) (TPLAgent, error) {
 	var c TPLAgent
 	if err := json.NewDecoder(rr).Decode(&c); err != nil {
 		return TPLAgent{}, fatal.NewError(fmt.Errorf("config decode error:%w", err))

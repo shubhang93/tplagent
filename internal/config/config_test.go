@@ -36,7 +36,7 @@ func (s *sampleActions) SetConfig(bb []byte) error {
 }
 
 func Test_readConfig(t *testing.T) {
-	t.Run("read config test", func(t *testing.T) {
+	t.Run("Read config test", func(t *testing.T) {
 		configJSON := `{
   "agent": {
     "log_level": "ERROR",
@@ -117,7 +117,7 @@ func Test_readConfig(t *testing.T) {
 				},
 			},
 		}
-		c, err := read(strings.NewReader(configJSON))
+		c, err := Read(strings.NewReader(configJSON))
 		if err != nil {
 			t.Errorf("error reading config:%v", err)
 			return
@@ -154,7 +154,7 @@ func Test_readConfig(t *testing.T) {
 
 	})
 
-	t.Run("test sample provider config read", func(t *testing.T) {
+	t.Run("test sample provider config Read", func(t *testing.T) {
 		configJSON := `{
   "agent": {
     "log_level": "ERROR",
@@ -180,7 +180,7 @@ func Test_readConfig(t *testing.T) {
   }
 }
 `
-		conf, err := read(strings.NewReader(configJSON))
+		conf, err := Read(strings.NewReader(configJSON))
 		if err != nil {
 			t.Errorf("error reading config:%v\n", err)
 		}
@@ -224,7 +224,7 @@ func Test_config_fatalErrors(t *testing.T) {
 		buff.Reset()
 		buff.Write(jsonCfg)
 
-		_, err = read(&buff)
+		_, err = Read(&buff)
 		if !fatal.Is(err) {
 			t.Error("expected fatal error")
 			return
@@ -257,7 +257,7 @@ func Test_config_fatalErrors(t *testing.T) {
 			return
 		}
 
-		_, err = read(&buff)
+		_, err = Read(&buff)
 		if !fatal.Is(err) {
 			t.Error("expected fatal error")
 		}

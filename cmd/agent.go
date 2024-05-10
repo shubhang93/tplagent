@@ -57,7 +57,6 @@ func spawnAndReload(rootCtx context.Context, processMaker func(logger *slog.Logg
 	signal.Notify(sighup, syscall.SIGHUP)
 
 	spawnErrChan := make(chan error, 1)
-
 	go func() {
 		err := spawn(ctx, processMaker, conf, false)
 		spawnErrChan <- err
