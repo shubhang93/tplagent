@@ -21,6 +21,7 @@ type AgentConfig struct {
 	LogLevel               slog.Level `json:"log_level"`
 	LogFmt                 string     `json:"log_fmt"`
 	MaxConsecutiveFailures int        `json:"max_consecutive_failures"`
+	HTTPListenerAddr       string     `json:"http_listener_addr"`
 }
 
 type ActionsConfig struct {

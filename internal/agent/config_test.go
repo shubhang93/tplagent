@@ -41,7 +41,8 @@ func Test_readConfig(t *testing.T) {
   "agent": {
     "log_level": "ERROR",
     "log_fmt": "json",
-	"max_consecutive_failures": 25
+	"max_consecutive_failures": 25,
+	"http_listener_addr": "localhost:5000"
   },
   "templates": {
     "test-config": {
@@ -84,11 +85,11 @@ func Test_readConfig(t *testing.T) {
 				LogLevel:               slog.LevelError,
 				LogFmt:                 "json",
 				MaxConsecutiveFailures: 25,
+				HTTPListenerAddr:       "localhost:5000",
 			},
 			TemplateSpecs: map[string]*TemplateConfig{
 				"test-config": {
 					RefreshInterval: duration.Duration(10 * time.Second),
-					//ExecCMD:         `echo "rendererd"`,
 					Exec: &ExecConfig{
 						Cmd:     "echo",
 						CmdArgs: []string{"rendered"},
