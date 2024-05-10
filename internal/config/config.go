@@ -1,4 +1,4 @@
-package agent
+package config
 
 import (
 	"encoding/json"
@@ -17,29 +17,29 @@ var allowedLogFmts = map[string]struct{}{
 	"text": {},
 }
 
-type AgentConfig struct {
+type Agent struct {
 	LogLevel               slog.Level `json:"log_level"`
 	LogFmt                 string     `json:"log_fmt"`
 	MaxConsecutiveFailures int        `json:"max_consecutive_failures"`
 	HTTPListenerAddr       string     `json:"http_listener_addr"`
 }
 
-type ActionsConfig struct {
+type Actions struct {
 	Name   string          `json:"name"`
 	Config json.RawMessage `json:"config"`
 }
 
-type ExecConfig struct {
+type ExecSpec struct {
 	Cmd        string            `json:"cmd"`
 	CmdArgs    []string          `json:"cmd_args"`
 	CmdTimeout duration.Duration `json:"cmd_timeout"`
 	Env        map[string]string `json:"env"`
 }
 
-type TemplateConfig struct {
+type TemplateSpec struct {
 	// required for
 	// creation of template
-	Actions            []ActionsConfig   `json:"actions,omitempty"`
+	Actions            []Actions         `json:"actions,omitempty"`
 	TemplateDelimiters []string          `json:"template_delimiters,omitempty"`
 	Source             string            `json:"source,omitempty"`
 	Raw                string            `json:"raw,omitempty"`
@@ -50,34 +50,34 @@ type TemplateConfig struct {
 	RenderOnce         bool              `json:"render_once,omitempty"`
 	MissingKey         string            `json:"missing_key"`
 
-	Exec *ExecConfig `json:"exec"`
+	Exec *ExecSpec `json:"exec"`
 }
 
-type Config struct {
-	Agent         AgentConfig                `json:"agent"`
-	TemplateSpecs map[string]*TemplateConfig `json:"templates"`
+type TPLAgent struct {
+	Agent         Agent                    `json:"agent"`
+	TemplateSpecs map[string]*TemplateSpec `json:"templates"`
 }
 
-func ReadConfigFromFile(path string) (Config, error) {
+func ReadFromFile(path string) (TPLAgent, error) {
 	confFile, err := os.Open(os.ExpandEnv(path))
 	if err != nil {
-		return Config{}, fatal.NewError(fmt.Errorf("read config:%w", err))
+		return TPLAgent{}, fatal.NewError(fmt.Errorf("read config:%w", err))
 	}
-	return readConfig(confFile)
+	return read(confFile)
 }
 
-func readConfig(rr io.Reader) (Config, error) {
-	var c Config
+func read(rr io.Reader) (TPLAgent, error) {
+	var c TPLAgent
 	if err := json.NewDecoder(rr).Decode(&c); err != nil {
-		return Config{}, fatal.NewError(fmt.Errorf("config decode error:%w", err))
+		return TPLAgent{}, fatal.NewError(fmt.Errorf("config decode error:%w", err))
 	}
-	if err := ValidateConfig(&c); err != nil {
-		return Config{}, fatal.NewError(err)
+	if err := Validate(&c); err != nil {
+		return TPLAgent{}, fatal.NewError(err)
 	}
 	return c, nil
 }
 
-func ValidateConfig(c *Config) error {
+func Validate(c *TPLAgent) error {
 	var valErrs []error
 	if _, ok := allowedLogFmts[c.Agent.LogFmt]; !ok {
 		valErrs = append(valErrs, fmt.Errorf("validate:invalid log level"))
@@ -119,7 +119,7 @@ func ValidateConfig(c *Config) error {
 
 }
 
-func validateActionConfigs(actions []ActionsConfig) error {
+func validateActionConfigs(actions []Actions) error {
 	var provValErrs []error
 	for i := range actions {
 		if actions[i].Name == "" {

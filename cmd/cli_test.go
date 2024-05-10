@@ -7,7 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/google/go-cmp/cmp"
-	"github.com/shubhang93/tplagent/internal/agent"
+	"github.com/shubhang93/tplagent/internal/config"
 	"github.com/shubhang93/tplagent/internal/duration"
 	"github.com/shubhang93/tplagent/internal/fatal"
 	"log/slog"
@@ -33,15 +33,15 @@ func Test_cli(t *testing.T) {
 		jd := json.NewEncoder(&expected)
 		jd.SetIndent("", strings.Repeat(" ", expectedIndent))
 
-		starter := agent.Config{
-			Agent: agent.AgentConfig{
+		starter := config.TPLAgent{
+			Agent: config.Agent{
 				LogLevel:               slog.LevelInfo,
 				LogFmt:                 "text",
 				MaxConsecutiveFailures: 10,
 			},
-			TemplateSpecs: map[string]*agent.TemplateConfig{
+			TemplateSpecs: map[string]*config.TemplateSpec{
 				"myapp-config1": {
-					Actions:     []agent.ActionsConfig{},
+					Actions:     []config.Actions{},
 					Source:      "/path/to/template-file1",
 					Destination: "/path/to/outfile1",
 					StaticData: map[string]string{
@@ -50,14 +50,14 @@ func Test_cli(t *testing.T) {
 					RefreshInterval: duration.Duration(1 * time.Second),
 					RenderOnce:      false,
 					MissingKey:      "error",
-					Exec: &agent.ExecConfig{
+					Exec: &config.ExecSpec{
 						Cmd:        "echo",
 						CmdArgs:    []string{"hello"},
 						CmdTimeout: duration.Duration(30 * time.Second),
 					},
 				},
 				"myapp-config2": {
-					Actions:     []agent.ActionsConfig{},
+					Actions:     []config.Actions{},
 					Source:      "/path/to/template-file2",
 					Destination: "/path/to/outfile2",
 					StaticData: map[string]string{
@@ -66,7 +66,7 @@ func Test_cli(t *testing.T) {
 					RefreshInterval: duration.Duration(1 * time.Second),
 					RenderOnce:      false,
 					MissingKey:      "error",
-					Exec: &agent.ExecConfig{
+					Exec: &config.ExecSpec{
 						Cmd:        "echo",
 						CmdArgs:    []string{"hello"},
 						CmdTimeout: duration.Duration(30 * time.Second),
@@ -99,15 +99,15 @@ func Test_cli(t *testing.T) {
 		jd := json.NewEncoder(&expected)
 		jd.SetIndent("", strings.Repeat(" ", defaultIndent))
 
-		starter := agent.Config{
-			Agent: agent.AgentConfig{
+		starter := config.TPLAgent{
+			Agent: config.Agent{
 				LogLevel:               slog.LevelInfo,
 				LogFmt:                 "text",
 				MaxConsecutiveFailures: 10,
 			},
-			TemplateSpecs: map[string]*agent.TemplateConfig{
+			TemplateSpecs: map[string]*config.TemplateSpec{
 				"myapp-config1": {
-					Actions:     []agent.ActionsConfig{},
+					Actions:     []config.Actions{},
 					Source:      "/path/to/template-file1",
 					Destination: "/path/to/outfile1",
 					StaticData: map[string]string{
@@ -116,7 +116,7 @@ func Test_cli(t *testing.T) {
 					RefreshInterval: duration.Duration(1 * time.Second),
 					RenderOnce:      false,
 					MissingKey:      "error",
-					Exec: &agent.ExecConfig{
+					Exec: &config.ExecSpec{
 						Cmd:        "echo",
 						CmdArgs:    []string{"hello"},
 						CmdTimeout: duration.Duration(30 * time.Second),
@@ -138,12 +138,12 @@ func Test_cli(t *testing.T) {
 	t.Run("start agent test", func(t *testing.T) {
 		configFilePath := tmpDir + "/config.json"
 		dest := tmpDir + "/config.render"
-		ac := agent.Config{Agent: agent.AgentConfig{
+		ac := config.TPLAgent{Agent: config.Agent{
 			LogLevel: slog.LevelInfo,
 			LogFmt:   "text",
-		}, TemplateSpecs: map[string]*agent.TemplateConfig{
+		}, TemplateSpecs: map[string]*config.TemplateSpec{
 			"test-config": {
-				Actions: []agent.ActionsConfig{{
+				Actions: []config.Actions{{
 					Name:   "sample",
 					Config: json.RawMessage(`{"greet_message":"Hello"}`),
 				}},
@@ -154,7 +154,7 @@ Sample Action:{{ sample_greet .name -}}`,
 				StaticData: map[string]string{
 					"name": "Foo",
 				},
-				Exec: &agent.ExecConfig{
+				Exec: &config.ExecSpec{
 					Cmd: "bash",
 					CmdArgs: []string{
 						"-c",

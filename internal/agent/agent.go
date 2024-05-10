@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/shubhang93/tplagent/internal/actionable"
 	"github.com/shubhang93/tplagent/internal/cmdexec"
+	"github.com/shubhang93/tplagent/internal/config"
 	"github.com/shubhang93/tplagent/internal/fatal"
 	"github.com/shubhang93/tplagent/internal/render"
 	"github.com/shubhang93/tplagent/internal/tplactions"
@@ -42,7 +43,7 @@ type sinkConfig struct {
 	refreshInterval time.Duration
 	html            bool
 	templateDelims  []string
-	actions         []ActionsConfig
+	actions         []config.Actions
 	dest            string
 	staticData      any
 	name            string
@@ -66,7 +67,7 @@ type Process struct {
 	maxConsecFailures int
 }
 
-func (p *Process) Start(ctx context.Context, config Config) error {
+func (p *Process) Start(ctx context.Context, config config.TPLAgent) error {
 	templConfig := config.TemplateSpecs
 	scs := sanitizeConfigs(templConfig)
 	p.configs = scs
@@ -74,7 +75,7 @@ func (p *Process) Start(ctx context.Context, config Config) error {
 	return p.startTickLoops(ctx)
 }
 
-func sanitizeConfigs(templConfig map[string]*TemplateConfig) []sinkExecConfig {
+func sanitizeConfigs(templConfig map[string]*config.TemplateSpec) []sinkExecConfig {
 	var i int
 	var scs = make([]sinkExecConfig, len(templConfig))
 	for name := range templConfig {

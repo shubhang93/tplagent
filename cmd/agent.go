@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/shubhang93/tplagent/internal/agent"
+	"github.com/shubhang93/tplagent/internal/config"
 	"github.com/shubhang93/tplagent/internal/fatal"
 	"log/slog"
 	"os"
@@ -22,7 +23,16 @@ const pidDir = "/tmp/tplagent"
 const pidFilename = "agent.pid"
 
 type agentProcess interface {
-	Start(context.Context, agent.Config) error
+	Start(context.Context, config.TPLAgent) error
+}
+
+type TPLAgent struct {
+	Logger    *slog.Logger
+	AgentProc *agent.Process
+}
+
+func (T *TPLAgent) Start(ctx context.Context, config config.TPLAgent) error {
+	return T.AgentProc.Start(ctx, config)
 }
 
 func startAgent(ctx context.Context, configFilePath string) error {
@@ -93,7 +103,7 @@ func spawnAndReload(rootCtx context.Context, processMaker func(logger *slog.Logg
 
 func spawn(ctx context.Context, processMaker func(logger *slog.Logger) agentProcess, confPath string, isReload bool) error {
 
-	config, err := agent.ReadConfigFromFile(confPath)
+	config, err := config.ReadFromFile(confPath)
 	if err != nil {
 		return err
 	}

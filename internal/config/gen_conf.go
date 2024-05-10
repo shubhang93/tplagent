@@ -1,4 +1,4 @@
-package agent
+package config
 
 import (
 	"encoding/json"
@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-func WriteConfig(wr io.Writer, numBlocks int, indent int) error {
-	starter := generateConfig(numBlocks)
+func WriteTo(wr io.Writer, numBlocks int, indent int) error {
+	starter := generate(numBlocks)
 
 	jd := json.NewEncoder(wr)
 	jd.SetIndent("", strings.Repeat(" ", indent))
@@ -21,14 +21,14 @@ func WriteConfig(wr io.Writer, numBlocks int, indent int) error {
 	return nil
 }
 
-func generateConfig(numBlocks int) Config {
-	starter := Config{
-		Agent: AgentConfig{
+func generate(numBlocks int) TPLAgent {
+	starter := TPLAgent{
+		Agent: Agent{
 			LogLevel:               slog.LevelInfo,
 			LogFmt:                 "text",
 			MaxConsecutiveFailures: 10,
 		},
-		TemplateSpecs: map[string]*TemplateConfig{},
+		TemplateSpecs: map[string]*TemplateSpec{},
 	}
 
 	for i := range numBlocks {
@@ -39,9 +39,9 @@ func generateConfig(numBlocks int) Config {
 	return starter
 }
 
-func makeTemplBlock(i int) *TemplateConfig {
-	return &TemplateConfig{
-		Actions:     []ActionsConfig{},
+func makeTemplBlock(i int) *TemplateSpec {
+	return &TemplateSpec{
+		Actions:     []Actions{},
 		Source:      fmt.Sprintf("/path/to/template-file%d", i),
 		Destination: fmt.Sprintf("/path/to/outfile%d", i),
 		StaticData: map[string]string{
@@ -50,7 +50,7 @@ func makeTemplBlock(i int) *TemplateConfig {
 		RefreshInterval: duration.Duration(1 * time.Second),
 		RenderOnce:      false,
 		MissingKey:      "error",
-		Exec: &ExecConfig{
+		Exec: &ExecSpec{
 			Cmd:        "echo",
 			CmdArgs:    []string{"hello"},
 			CmdTimeout: duration.Duration(30 * time.Second),

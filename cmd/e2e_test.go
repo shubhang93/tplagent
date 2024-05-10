@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"github.com/shubhang93/tplagent/internal/agent"
+	"github.com/shubhang93/tplagent/internal/config"
 	"github.com/shubhang93/tplagent/internal/duration"
 	"log/slog"
 	"net/http"
@@ -29,13 +29,13 @@ func TestE2E(t *testing.T) {
 
 	serverConfDest := tmp + "/server-conf.json"
 	appConfDest := tmp + "/app-conf.json"
-	cfg := agent.Config{
-		Agent: agent.AgentConfig{
+	cfg := config.TPLAgent{
+		Agent: config.Agent{
 			LogLevel:               slog.LevelInfo,
 			LogFmt:                 "json",
 			MaxConsecutiveFailures: 10,
 		},
-		TemplateSpecs: map[string]*agent.TemplateConfig{
+		TemplateSpecs: map[string]*config.TemplateSpec{
 			"app-conf": {
 				Raw:         `{"id":"{{.ID}}"}`,
 				Destination: appConfDest,
@@ -46,7 +46,7 @@ func TestE2E(t *testing.T) {
 				MissingKey:      "error",
 			},
 			"server-conf": {
-				Actions: []agent.ActionsConfig{{
+				Actions: []config.Actions{{
 					Name:   "httpjson",
 					Config: json.RawMessage(`{"base_url":"http://localhost:6000"}`),
 				}},
@@ -57,7 +57,7 @@ func TestE2E(t *testing.T) {
 					"LogLevel": "ERROR",
 				},
 				RefreshInterval: duration.Duration(1 * time.Second),
-				Exec: &agent.ExecConfig{
+				Exec: &config.ExecSpec{
 					Cmd: "bash",
 					CmdArgs: []string{
 						"-c",

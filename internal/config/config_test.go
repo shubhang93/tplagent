@@ -1,4 +1,4 @@
-package agent
+package config
 
 import (
 	"bytes"
@@ -80,23 +80,23 @@ func Test_readConfig(t *testing.T) {
   }
 }
 `
-		expectedConfig := Config{
-			Agent: AgentConfig{
+		expectedConfig := TPLAgent{
+			Agent: Agent{
 				LogLevel:               slog.LevelError,
 				LogFmt:                 "json",
 				MaxConsecutiveFailures: 25,
 				HTTPListenerAddr:       "localhost:5000",
 			},
-			TemplateSpecs: map[string]*TemplateConfig{
+			TemplateSpecs: map[string]*TemplateSpec{
 				"test-config": {
 					RefreshInterval: duration.Duration(10 * time.Second),
-					Exec: &ExecConfig{
+					Exec: &ExecSpec{
 						Cmd:     "echo",
 						CmdArgs: []string{"rendered"},
 					},
 					Source:      "/etc/tmpl/test.tmpl",
 					Destination: "/etc/config/test.cfg",
-					Actions: []ActionsConfig{
+					Actions: []Actions{
 						{
 							Name: "test_provider",
 							Config: json.RawMessage(`{
@@ -107,7 +107,7 @@ func Test_readConfig(t *testing.T) {
 				},
 				"test-config2": {
 					RefreshInterval: duration.Duration(5 * time.Second),
-					Exec: &ExecConfig{
+					Exec: &ExecSpec{
 						Cmd:     "echo",
 						CmdArgs: []string{"rendered"},
 						Env:     map[string]string{"HOME": "xyzzy/spoonshift1"},
@@ -117,7 +117,7 @@ func Test_readConfig(t *testing.T) {
 				},
 			},
 		}
-		c, err := readConfig(strings.NewReader(configJSON))
+		c, err := read(strings.NewReader(configJSON))
 		if err != nil {
 			t.Errorf("error reading config:%v", err)
 			return
@@ -129,15 +129,15 @@ func Test_readConfig(t *testing.T) {
 	})
 
 	t.Run("test config validation", func(t *testing.T) {
-		c := &Config{
-			Agent: AgentConfig{
+		c := &TPLAgent{
+			Agent: Agent{
 				LogLevel: slog.LevelError,
 				LogFmt:   "xml",
 			},
-			TemplateSpecs: map[string]*TemplateConfig{
+			TemplateSpecs: map[string]*TemplateSpec{
 				"templ-conf": {
 					RefreshInterval: duration.Duration(500 * time.Millisecond),
-					Actions:         []ActionsConfig{{}},
+					Actions:         []Actions{{}},
 				},
 				"templ-conf2": {
 					RefreshInterval: duration.Duration(1 * time.Second),
@@ -146,7 +146,7 @@ func Test_readConfig(t *testing.T) {
 				},
 			},
 		}
-		if err := ValidateConfig(c); err == nil {
+		if err := Validate(c); err == nil {
 			t.Errorf("expected error got nil")
 		} else {
 			t.Log(err)
@@ -180,7 +180,7 @@ func Test_readConfig(t *testing.T) {
   }
 }
 `
-		conf, err := readConfig(strings.NewReader(configJSON))
+		conf, err := read(strings.NewReader(configJSON))
 		if err != nil {
 			t.Errorf("error reading config:%v\n", err)
 		}
@@ -203,7 +203,7 @@ func Test_readConfig(t *testing.T) {
 
 func Test_config_fatalErrors(t *testing.T) {
 	t.Run("ReadConfig fails", func(t *testing.T) {
-		_, err := ReadConfigFromFile("/some/path/that/does/not/exist")
+		_, err := ReadFromFile("/some/path/that/does/not/exist")
 		if !fatal.Is(err) {
 			t.Error("expected fatal error")
 		}
@@ -211,7 +211,7 @@ func Test_config_fatalErrors(t *testing.T) {
 
 	t.Run("config decoding fails", func(t *testing.T) {
 		var buff bytes.Buffer
-		err := WriteConfig(&buff, 1, 2)
+		err := WriteTo(&buff, 1, 2)
 		if err != nil {
 			t.Error(err)
 			return
@@ -224,7 +224,7 @@ func Test_config_fatalErrors(t *testing.T) {
 		buff.Reset()
 		buff.Write(jsonCfg)
 
-		_, err = readConfig(&buff)
+		_, err = read(&buff)
 		if !fatal.Is(err) {
 			t.Error("expected fatal error")
 			return
@@ -233,13 +233,13 @@ func Test_config_fatalErrors(t *testing.T) {
 	})
 	t.Run("config validation fails", func(t *testing.T) {
 		var buff bytes.Buffer
-		err := WriteConfig(&buff, 1, 2)
+		err := WriteTo(&buff, 1, 2)
 		if err != nil {
 			t.Error(err)
 			return
 		}
 
-		var c Config
+		var c TPLAgent
 		err = json.NewDecoder(&buff).Decode(&c)
 		if err != nil {
 			t.Error(err)
@@ -257,7 +257,7 @@ func Test_config_fatalErrors(t *testing.T) {
 			return
 		}
 
-		_, err = readConfig(&buff)
+		_, err = read(&buff)
 		if !fatal.Is(err) {
 			t.Error("expected fatal error")
 		}

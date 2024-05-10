@@ -5,7 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/shubhang93/tplagent/internal/agent"
+	"github.com/shubhang93/tplagent/internal/config"
 	"io"
 	"runtime"
 	"strings"
@@ -65,7 +65,7 @@ Go Runtime: %s`
 			*indent = 2
 		}
 
-		err = agent.WriteConfig(stdout, *numBlocks, *indent)
+		err = config.WriteTo(stdout, *numBlocks, *indent)
 		if err != nil {
 			return err
 		}

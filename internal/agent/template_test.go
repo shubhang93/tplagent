@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/google/go-cmp/cmp"
 	"github.com/shubhang93/tplagent/internal/actionable"
+	"github.com/shubhang93/tplagent/internal/config"
 	"github.com/shubhang93/tplagent/internal/tplactions"
 	"github.com/shubhang93/tplagent/internal/tplactions/sample"
 	"strings"
@@ -19,7 +20,7 @@ func Test_template_helpers(t *testing.T) {
 			},
 		}
 		templ := actionable.NewTemplate("test", false)
-		err := attachActions(templ, registry, newLogger(), []ActionsConfig{{
+		err := attachActions(templ, registry, newLogger(), []config.Actions{{
 			Name:   "sample",
 			Config: nil,
 		}})
@@ -39,7 +40,7 @@ func Test_template_helpers(t *testing.T) {
 			},
 		}
 		templ := actionable.NewTemplate("test", false)
-		err := attachActions(templ, registry, newLogger(), []ActionsConfig{{
+		err := attachActions(templ, registry, newLogger(), []config.Actions{{
 			Name:   "sample",
 			Config: json.RawMessage(`{"gree":`),
 		}})
@@ -61,7 +62,7 @@ func Test_template_helpers(t *testing.T) {
 		}
 		templ := actionable.NewTemplate("test", false)
 
-		err := attachActions(templ, registry, newLogger(), []ActionsConfig{{
+		err := attachActions(templ, registry, newLogger(), []config.Actions{{
 			Name:   "hey",
 			Config: json.RawMessage(`{"greet_message":"hey"}`),
 		}, {

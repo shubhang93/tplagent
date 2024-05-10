@@ -7,6 +7,7 @@ import (
 	"fmt"
 	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/shubhang93/tplagent/internal/actionable"
+	config2 "github.com/shubhang93/tplagent/internal/config"
 	"github.com/shubhang93/tplagent/internal/duration"
 	"github.com/shubhang93/tplagent/internal/fatal"
 	"github.com/shubhang93/tplagent/internal/render"
@@ -26,7 +27,7 @@ func must(err error) {
 
 func Test_makeSinkExecConfigs(t *testing.T) {
 	t.Run("paths containing env vars should get expanded", func(t *testing.T) {
-		config := map[string]*TemplateConfig{
+		config := map[string]*config2.TemplateSpec{
 			"testconfig": {
 				Source:          "$HOME/testdir",
 				Destination:     "${HOME}/testdir2",
@@ -34,14 +35,14 @@ func Test_makeSinkExecConfigs(t *testing.T) {
 				StaticData:      map[string]any{},
 				RefreshInterval: duration.Duration(1 * time.Second),
 				RenderOnce:      true,
-				Exec: &ExecConfig{
+				Exec: &config2.ExecSpec{
 					Cmd:        "echo",
 					CmdArgs:    []string{"hello"},
 					CmdTimeout: duration.Duration(5 * time.Second),
 				},
 			},
 			"testconfig2": {
-				Actions: []ActionsConfig{{
+				Actions: []config2.Actions{{
 					Name:   "httpJson",
 					Config: []byte(`{"key":"value"}`),
 				}},
@@ -49,7 +50,7 @@ func Test_makeSinkExecConfigs(t *testing.T) {
 				HTML:               true,
 				StaticData:         map[string]any{},
 				RenderOnce:         true,
-				Exec: &ExecConfig{
+				Exec: &config2.ExecSpec{
 					Cmd:     "echo",
 					CmdArgs: []string{"hello"},
 				},
@@ -78,7 +79,7 @@ func Test_makeSinkExecConfigs(t *testing.T) {
 				sinkConfig: sinkConfig{
 					html:           true,
 					templateDelims: []string{"<<", ">>"},
-					actions: []ActionsConfig{{
+					actions: []config2.Actions{{
 						Name:   "httpJson",
 						Config: []byte(`{"key":"value"}`),
 					}},
@@ -277,7 +278,7 @@ func Test_renderLoop(t *testing.T) {
 			}, {
 				sinkConfig: sinkConfig{
 					name: "nonExistentAction",
-					actions: []ActionsConfig{{
+					actions: []config2.Actions{{
 						Name:   "fooaction",
 						Config: nil,
 					}},

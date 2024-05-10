@@ -3,13 +3,14 @@ package agent
 import (
 	"fmt"
 	"github.com/shubhang93/tplagent/internal/actionable"
+	"github.com/shubhang93/tplagent/internal/config"
 	"github.com/shubhang93/tplagent/internal/tplactions"
 	"log/slog"
 	"os"
 	"text/template"
 )
 
-func attachActions(t *actionable.Template, registry map[string]tplactions.MakeFunc, l *slog.Logger, templActions []ActionsConfig) error {
+func attachActions(t *actionable.Template, registry map[string]tplactions.MakeFunc, l *slog.Logger, templActions []config.Actions) error {
 	namesSpacedFuncMap := make(template.FuncMap)
 	for _, ta := range templActions {
 		actionMaker, ok := registry[ta.Name]

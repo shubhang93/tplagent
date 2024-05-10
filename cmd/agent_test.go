@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/go-cmp/cmp"
-	"github.com/shubhang93/tplagent/internal/agent"
+	"github.com/shubhang93/tplagent/internal/config"
 	"github.com/shubhang93/tplagent/internal/fatal"
 	"log/slog"
 	"os"
@@ -16,9 +16,9 @@ import (
 	"time"
 )
 
-type mockAgent func(ctx context.Context, config agent.Config) error
+type mockAgent func(ctx context.Context, config config.TPLAgent) error
 
-func (m mockAgent) Start(ctx context.Context, config agent.Config) error {
+func (m mockAgent) Start(ctx context.Context, config config.TPLAgent) error {
 	return m(ctx, config)
 }
 
@@ -53,7 +53,7 @@ func Test_spawnAndReload(t *testing.T) {
 
 		reloadTimes := 5
 
-		var newConfigs []agent.Config
+		var newConfigs []config.TPLAgent
 		var expectedContextCauses []string
 		for i := range reloadTimes {
 			cfgSuffix := fmt.Sprintf("new%d", i)
@@ -84,10 +84,10 @@ func Test_spawnAndReload(t *testing.T) {
 			}
 		}()
 
-		var gotConfigs []agent.Config
+		var gotConfigs []config.TPLAgent
 		var gotContextCauses []string
 
-		ma := mockAgent(func(ctx context.Context, config agent.Config) error {
+		ma := mockAgent(func(ctx context.Context, config config.TPLAgent) error {
 
 			select {
 			case <-ctx.Done():
@@ -107,7 +107,7 @@ func Test_spawnAndReload(t *testing.T) {
 			t.Error(err)
 		}
 
-		expectedConfigs := append([]agent.Config{oldConfig}, newConfigs...)
+		expectedConfigs := append([]config.TPLAgent{oldConfig}, newConfigs...)
 
 		if diff := cmp.Diff(expectedConfigs, gotConfigs); diff != "" {
 			t.Errorf("(--Want ++Got)\n%s", diff)
@@ -150,7 +150,7 @@ func Test_spawnAndReload(t *testing.T) {
 
 		reloadTimes := 5
 
-		var newConfigs []agent.Config
+		var newConfigs []config.TPLAgent
 		for i := range reloadTimes {
 			cfgSuffix := fmt.Sprintf("new%d", i)
 			newConfig := makeConfig(cfgSuffix, tmpDir)
@@ -179,10 +179,10 @@ func Test_spawnAndReload(t *testing.T) {
 			}
 		}()
 
-		var gotConfigs []agent.Config
+		var gotConfigs []config.TPLAgent
 		var gotContextCauses []string
 
-		ma := mockAgent(func(ctx context.Context, config agent.Config) error {
+		ma := mockAgent(func(ctx context.Context, config config.TPLAgent) error {
 
 			select {
 			case <-ctx.Done():
@@ -202,7 +202,7 @@ func Test_spawnAndReload(t *testing.T) {
 			t.Errorf("expected fatal error got %v", err)
 		}
 
-		expectedConfigs := append([]agent.Config{oldConfig})
+		expectedConfigs := append([]config.TPLAgent{oldConfig})
 
 		if diff := cmp.Diff(expectedConfigs, gotConfigs); diff != "" {
 			t.Errorf("(--Want ++Got)\n%s", diff)
@@ -227,15 +227,15 @@ func Test_spawnAndReload(t *testing.T) {
 			return
 		}
 
-		config := makeConfig("test", tmpDir)
-		err = json.NewEncoder(f).Encode(config)
+		cfg := makeConfig("test", tmpDir)
+		err = json.NewEncoder(f).Encode(cfg)
 		if err != nil {
 			t.Errorf("error writing old config:%v", err)
 			return
 		}
 		_ = f.Close()
 
-		ma := mockAgent(func(ctx context.Context, config agent.Config) error {
+		ma := mockAgent(func(ctx context.Context, cfg config.TPLAgent) error {
 
 			select {
 			case <-ctx.Done():
@@ -260,7 +260,7 @@ func Test_spawnAndReload(t *testing.T) {
 
 		startCount := 0
 		pm := func(l *slog.Logger) agentProcess {
-			return mockAgent(func(ctx context.Context, config agent.Config) error {
+			return mockAgent(func(ctx context.Context, config config.TPLAgent) error {
 				startCount++
 				return fatal.NewError(errors.New("fatal error"))
 			})
@@ -290,13 +290,13 @@ func Test_spawnAndReload(t *testing.T) {
 
 }
 
-var makeConfig = func(suffix string, tmpDir string) agent.Config {
-	return agent.Config{
-		Agent: agent.AgentConfig{
+var makeConfig = func(suffix string, tmpDir string) config.TPLAgent {
+	return config.TPLAgent{
+		Agent: config.Agent{
 			LogLevel: slog.LevelInfo,
 			LogFmt:   "text",
 		},
-		TemplateSpecs: map[string]*agent.TemplateConfig{
+		TemplateSpecs: map[string]*config.TemplateSpec{
 			"templ1": {
 				Raw:         fmt.Sprintf("{{.Name_%s}}", suffix),
 				Destination: tmpDir + "/dest.render" + suffix,
