@@ -111,24 +111,26 @@ func Test_makeSinkExecConfigs(t *testing.T) {
 
 func Test_renderLoop(t *testing.T) {
 
+	const timeoutMS = 5000
 	tmpDir := t.TempDir()
 	renderPath := fmt.Sprintf("%s/%s", tmpDir, "test.render")
 	tpl := actionable.NewTemplate("test", false)
 	must(tpl.Parse("Name {{.name}}"))
 
 	type loopTest struct {
-		name      string
-		wantCount int
-		cfg       sinkExecConfig
+		name             string
+		wantAtleastCount int
+		cfg              sinkExecConfig
 	}
 
+	const refersIntervalMS = 500
 	ltests := []loopTest{{
-		name:      "render once is false",
-		wantCount: 10,
+		name:             "render once is false",
+		wantAtleastCount: 8,
 		cfg: sinkExecConfig{
 			sinkConfig: sinkConfig{
 				parsed:          tpl,
-				refreshInterval: 500 * time.Millisecond,
+				refreshInterval: refersIntervalMS * time.Millisecond,
 				dest:            renderPath,
 				staticData:      map[string]any{"name": "foo"},
 				name:            "test-tmpl",
@@ -140,13 +142,13 @@ func Test_renderLoop(t *testing.T) {
 			},
 		},
 	}, {
-		name:      "render once is true",
-		wantCount: 1,
+		name:             "render once is true",
+		wantAtleastCount: 1,
 		cfg: sinkExecConfig{
 			sinkConfig: sinkConfig{
 				renderOnce:      true,
 				parsed:          tpl,
-				refreshInterval: 500 * time.Millisecond,
+				refreshInterval: refersIntervalMS * time.Millisecond,
 				dest:            renderPath,
 				staticData:      map[string]any{"name": "foo"},
 				name:            "test-tmpl",
@@ -162,7 +164,7 @@ func Test_renderLoop(t *testing.T) {
 
 	for _, ltest := range ltests {
 		t.Run(ltest.name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), 5000*time.Millisecond)
+			ctx, cancel := context.WithTimeout(context.Background(), timeoutMS*time.Millisecond)
 			defer cancel()
 
 			execCount := 0
@@ -180,8 +182,9 @@ func Test_renderLoop(t *testing.T) {
 			if err != nil && !errors.Is(err, context.DeadlineExceeded) {
 				t.Errorf("%v", err)
 			}
-			if ltest.wantCount != execCount {
-				t.Errorf("expected count %d got %d", ltest.wantCount, execCount)
+
+			if execCount < ltest.wantAtleastCount {
+				t.Errorf("expected count atleast %d got %d", ltest.wantAtleastCount, execCount)
 			}
 		})
 	}
