@@ -81,16 +81,6 @@ func (a *Actions) FuncMap() template.FuncMap {
 			}
 			return s, nil
 		},
-		"MapGet": func(key string, m map[string]any) any {
-			return m[key]
-		},
-		"SliceGet": func(index int, s []any) any {
-			n := len(s)
-			if index < n {
-				return s[index]
-			}
-			return nil
-		},
 	}
 }
 
