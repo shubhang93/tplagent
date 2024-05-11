@@ -8,6 +8,7 @@ import (
 	"github.com/shubhang93/tplagent/internal/agent"
 	"github.com/shubhang93/tplagent/internal/config"
 	"github.com/shubhang93/tplagent/internal/fatal"
+	"github.com/shubhang93/tplagent/internal/httplis"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -107,6 +108,12 @@ func spawn(ctx context.Context, processMaker func(logger *slog.Logger) agentProc
 		logger.Info("starting agent")
 	}
 
+	wait := make(chan struct{})
+	go func() {
+		defer close(wait)
+		httplis.Start(ctx, conf.Agent.HTTPListenerAddr, logger)
+	}()
+
 	proc := processMaker(logger)
 	err := proc.Start(ctx, conf)
 	if err != nil {
@@ -114,6 +121,7 @@ func spawn(ctx context.Context, processMaker func(logger *slog.Logger) agentProc
 		return err
 	}
 	logger.Info("agent exited without errors")
+	<-wait
 	return nil
 }
 

@@ -80,7 +80,7 @@ func Read(rr io.Reader) (TPLAgent, error) {
 func Validate(c *TPLAgent) error {
 	var valErrs []error
 	if _, ok := allowedLogFmts[c.Agent.LogFmt]; !ok {
-		valErrs = append(valErrs, fmt.Errorf("validate:invalid log level"))
+		valErrs = append(valErrs, fmt.Errorf("validate:invalid log format"))
 	}
 
 	for tmplName, tmplConfig := range c.TemplateSpecs {
