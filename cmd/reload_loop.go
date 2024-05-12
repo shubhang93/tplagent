@@ -56,6 +56,7 @@ func reloadProcs(root context.Context, configPath string, starters procStarters)
 				agentWG.Done()
 			}()
 		case err := <-errCh:
+			agentWG.Wait()
 			lastAgentErr = err
 			if fatal.Is(err) {
 				cancel(err)
