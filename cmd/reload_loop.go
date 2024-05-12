@@ -6,6 +6,7 @@ import (
 	"github.com/shubhang93/tplagent/internal/fatal"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 )
 
@@ -13,8 +14,6 @@ type procStarters struct {
 	listener func(ctx context.Context, conf config.TPLAgent, reload bool) error
 	agent    func(ctx context.Context, conf config.TPLAgent, reload bool) error
 }
-
-type semToken struct{}
 
 func reloadProcs(root context.Context, configPath string, starters procStarters) error {
 	ctx, cancel := context.WithCancelCause(root)
@@ -35,11 +34,11 @@ func reloadProcs(root context.Context, configPath string, starters procStarters)
 	}()
 
 	errCh := make(chan error, 1)
-	agentSem := make(chan semToken, 1)
-	agentSem <- semToken{}
+	var agentWG sync.WaitGroup
+	agentWG.Add(1)
 	go func() {
 		errCh <- starters.agent(ctx, conf, false)
-		<-agentSem
+		agentWG.Done()
 	}()
 
 	var lastAgentErr error
@@ -48,12 +47,13 @@ func reloadProcs(root context.Context, configPath string, starters procStarters)
 		case <-sighup:
 			cancel(sighupReceived)
 			<-lisDone
-			ctx, cancel = context.WithCancelCause(root)
+			agentWG.Wait()
 
-			agentSem <- semToken{}
+			ctx, cancel = context.WithCancelCause(root)
+			agentWG.Add(1)
 			go func() {
 				errCh <- starters.agent(ctx, conf, true)
-				<-agentSem
+				agentWG.Done()
 			}()
 		case err := <-errCh:
 			lastAgentErr = err
@@ -63,7 +63,7 @@ func reloadProcs(root context.Context, configPath string, starters procStarters)
 			}
 		case <-ctx.Done():
 			<-lisDone
-			agentSem <- semToken{}
+			agentWG.Wait()
 			return lastAgentErr
 		}
 	}
