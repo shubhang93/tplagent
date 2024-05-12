@@ -111,10 +111,12 @@ func TestStart(t *testing.T) {
 				}
 			}()
 
+			server := Server{Logger: newLogger()}
+
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				Start(ctx, "localhost:6000", newLogger())
+				server.Start(ctx, "localhost:6000")
 			}()
 
 			rdr := strings.NewReader(rt.jsonBody(tmp))

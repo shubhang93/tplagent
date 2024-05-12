@@ -64,10 +64,18 @@ type Process struct {
 	Logger            *slog.Logger
 	TickFunc          tickFunc
 	configs           []sinkExecConfig
+	Reloaded          bool
 	maxConsecFailures int
 }
 
 func (p *Process) Start(ctx context.Context, config config.TPLAgent) error {
+
+	if p.Reloaded {
+		p.Logger.Info("agent reloading")
+	} else {
+		p.Logger.Info("agent starting")
+	}
+
 	templConfig := config.TemplateSpecs
 	scs := sanitizeConfigs(templConfig)
 	p.configs = scs

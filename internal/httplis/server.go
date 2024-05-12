@@ -12,6 +12,7 @@ import (
 	"os"
 	"strings"
 	"syscall"
+	"time"
 )
 
 type reloadRequest struct {
@@ -19,23 +20,34 @@ type reloadRequest struct {
 	ConfigPath string          `json:"config_path"`
 }
 
-func Start(ctx context.Context, addr string, l *slog.Logger) {
+type Server struct {
+	Logger   *slog.Logger
+	Reloaded bool
+}
+
+func (s *Server) Start(ctx context.Context, addr string) {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("POST /config/reload", reloadConfig)
 
-	s := http.Server{Handler: mux, Addr: addr}
+	srvr := http.Server{Handler: mux, Addr: addr}
 
 	wait := make(chan struct{})
 	go func() {
 		defer close(wait)
-		<-ctx.Done()
-		_ = s.Shutdown(ctx)
+
+		select {
+		case <-ctx.Done():
+		}
+
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
+		_ = srvr.Shutdown(shutdownCtx)
 	}()
 
-	err := s.ListenAndServe()
+	err := srvr.ListenAndServe()
 	if !errors.Is(err, http.ErrServerClosed) && err != nil {
-		l.Error("ListenAndServe error", slog.String("error", err.Error()))
+		s.Logger.Error("ListenAndServe error", slog.String("error", err.Error()))
 	}
 
 	<-wait

@@ -124,6 +124,45 @@ func TestE2E(t *testing.T) {
 	}
 }
 
+func Test_With_HTTPLis(t *testing.T) {
+	tmp := t.TempDir()
+	configPath := tmp + "/config.json"
+
+	f, err := os.Create(configPath)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	cfg := config.TPLAgent{
+		Agent: config.Agent{
+			LogLevel:               slog.LevelInfo,
+			LogFmt:                 "json",
+			MaxConsecutiveFailures: 10,
+			HTTPListenerAddr:       "localhost:6000",
+		},
+		TemplateSpecs: map[string]*config.TemplateSpec{
+			"appconf": {
+				Raw:         "hello {{.name}}",
+				Destination: tmp + "/appconf.txt",
+				StaticData:  map[string]any{"name": "foo"},
+				RenderOnce:  true,
+			},
+		},
+	}
+
+	if err := json.NewEncoder(f).Encode(cfg); err != nil {
+		t.Error(err)
+		return
+	}
+	_ = f.Close()
+
+	err = startCLI(context.Background(), os.Stdout, []string{"start", "-config", configPath}...)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func startGracefulHTTPServer(ctx context.Context) {
 	mux := http.NewServeMux()
 
