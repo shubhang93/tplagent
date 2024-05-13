@@ -188,7 +188,7 @@ func Test_With_HTTPLis(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 	resp, err := http.Post("http://localhost:6000/config/reload", "application/json", &buff)
-	if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+	if err != nil {
 		t.Error(err)
 		return
 	}
@@ -196,7 +196,7 @@ func Test_With_HTTPLis(t *testing.T) {
 		t.Errorf("expected status code %d got %d", http.StatusOK, resp.StatusCode)
 	}
 
-	if err := <-cliErr; err != nil {
+	if err := <-cliErr; err != nil && !errors.Is(err, context.DeadlineExceeded) {
 		t.Errorf("CLI err %v", err)
 	}
 
