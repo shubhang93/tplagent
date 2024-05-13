@@ -82,6 +82,7 @@ func TestStart(t *testing.T) {
 		},
 	}
 
+	const addr = "localhost:6000"
 	for _, rt := range reloadTests {
 		t.Run(rt.name, func(t *testing.T) {
 
@@ -116,7 +117,7 @@ func TestStart(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				server.Start(ctx, "localhost:6000")
+				server.Start(ctx, addr)
 			}()
 
 			time.Sleep(100 * time.Millisecond)
@@ -140,6 +141,35 @@ func TestStart(t *testing.T) {
 
 		})
 	}
+
+	t.Run("stop endpoint", func(t *testing.T) {
+		s := Server{
+			Logger:   newLogger(),
+			Reloaded: false,
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		done := make(chan struct{})
+		defer func() {
+			<-done
+		}()
+		go func() {
+			defer close(done)
+			s.Start(ctx, addr)
+		}()
+
+		time.Sleep(100 * time.Millisecond)
+		resp, err := http.Post("http://"+addr+"/agent/stop", "application/json", nil)
+		if err != nil {
+			t.Error(err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("req failed with status %d", resp.StatusCode)
+		}
+
+	})
 
 }
 
