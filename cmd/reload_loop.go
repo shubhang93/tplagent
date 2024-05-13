@@ -73,10 +73,10 @@ func reloadProcs(root context.Context, configPath string, starters procStarters)
 				<-serverDone
 				return err
 			}
-			// for non-fatal errors
-			// server goroutine
-			// is kept running
-			// to allow reloads
+		// for non-fatal errors
+		// server goroutine
+		// is kept running
+		// to allow reloads
 		case <-ctx.Done():
 			err := <-agentErrCh
 			<-serverDone

@@ -34,7 +34,12 @@ func (p *Proc) Start(ctx context.Context, addr string) {
 	mux.HandleFunc(reloadEndpoint, p.reloadConfig)
 	mux.HandleFunc(stopAgent, p.stopAgent)
 
-	srvr := http.Server{Handler: mux, Addr: addr}
+	srvr := http.Server{
+		Addr:         addr,
+		Handler:      mux,
+		WriteTimeout: 3 * time.Second,
+		ReadTimeout:  10 * time.Second,
+	}
 
 	wait := make(chan struct{})
 	go func() {
@@ -88,14 +93,8 @@ func writeJSON(writer http.ResponseWriter, status int, data any) {
 
 func (p *Proc) reloadConfig(writer http.ResponseWriter, request *http.Request) {
 
-	proc, err := os.FindProcess(os.Getpid())
-	if err != nil {
-		writeJSON(writer, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-		return
-	}
-
 	reloadReq := reloadRequest{}
-	err = json.NewDecoder(request.Body).Decode(&reloadReq)
+	err := json.NewDecoder(request.Body).Decode(&reloadReq)
 	if err != nil {
 		writeJSON(writer, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
@@ -122,14 +121,18 @@ func (p *Proc) reloadConfig(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	p.Logger.Info("wrote new config")
-
+	proc, err := os.FindProcess(os.Getpid())
+	if err != nil {
+		writeJSON(writer, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
 	err = proc.Signal(syscall.SIGHUP)
 	if err != nil {
 		writeJSON(writer, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
 
+	p.Logger.Info("reload triggerred")
 	writeJSON(writer, http.StatusOK, map[string]bool{"success": true})
 
 }
