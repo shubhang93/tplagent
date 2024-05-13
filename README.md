@@ -1,29 +1,21 @@
 # tplagent
 
-<!-- TOC -->
-* [tplagent](#tplagent)
-  * [Generate and refresh config/any type of files dynamically using Go templates](#generate-and-refresh-configany-type-of-files-dynamically-using-go-templates)
-  * [Installation instructions](#installation-instructions)
-  * [Supported Platforms](#supported-platforms)
-  * [Directory Permissions](#directory-permissions)
-  * [Reloading the agent](#reloading-the-agent)
-  * [Configuration explained](#configuration-explained)
-  * [Actions](#actions)
-    * [How to invoke a certain action](#how-to-invoke-a-certain-action)
-    * [Contributing new actions](#contributing-new-actions)
-  * [On How to use Go templates properly please refer to](#on-how-to-use-go-templates-properly-please-refer-to)
-<!-- TOC -->
-## Generate and refresh config/any type of files dynamically using Go templates
+TPLAgent is an agent for rendering Go templates into meaningful entities ( like config files, HTML views, etc... ).
+The agent periodically renders your templates based on a simple JSON config
 
-`tplagent` can be invoked as a daemon process on your VMs to dynamically generate config files / any kind of content
-and refresh them periodically based on a JSON config file. This project is inspired by telegraf agent and the consul
-template projects, it combines certain aspects of both projects to provide a more generic interface for generating and
-refreshing config files.
+- Offers a user-friendly CLI to control the agent
+- Uses a pluggable architecture to define custom template actions
+- Allows config reloading to reload the agent whilst running
+- Utilizes JSON for configuration, no learning curve required
+- Zero dependencies
+- Create custom-builds by forking and adding your proprietary template actions
 
 ## Installation instructions
 
 - Download the latest version of `tplagent` from the GitHub releases section.
 - Generate a starter configuration by using the `tplagent genconf` command
+
+## Usage
 
 ```shell
   tplagnet genconf -n <number_of_template_blocks> -indent <json_indent> > /path/to/config.json
@@ -34,18 +26,17 @@ refreshing config files.
 ```shell
 tplagent start -config /path/to/config.json
 ```
-**NOTE** 
-It is recommended to run the agent as a daemon process by creating and configuring a valid systemd unit file. This way the agent can be restarted inspite of system reboots.
+
+**NOTE**
+It is recommended to run the agent as a daemon process by creating and configuring a valid systemd unit file. This way
+the agent can be restarted irrespective of system reboots.
 It is much easier to reload the agent.
-
-## Supported Platforms
-
-Windows is not supported. Only Linux and macOS are supported. PRs are welcome to add support for windows
 
 ## Directory Permissions
 
 It is recommended that the `tplagent` process is started under a dedicated user meant for `tplagent`. All directories
-and files created by `tplagent` use the `766` permissions. It is also recommended to set the right directory permissions as
+and files created by `tplagent` use the `766` permissions. It is also recommended to set the right directory permissions
+as
 part of setting up the agent to avoid permission errors.
 
 ## Reloading the agent
@@ -53,12 +44,14 @@ part of setting up the agent to avoid permission errors.
 Agent can be reloaded by sending a SIGHUP signal to the agent process, if the agent process starts up successfully the
 PID is stored inside
 `/tmp/tplagent/agent.pid`. Agent reloading can be useful to read new config. For example
+
 1) Edit the agent config file and save it
 2) Locate the PID file
    ```shell
    PID=$(cat /tmp/tplagent/agent.pid)
    kill -1 $PID
    ```
+
 3 ) A future CLI command will be added to reload the process using `tplagent reload`
 
 ## Configuration explained
@@ -206,6 +199,12 @@ We want to include actions which can be used by most people.
 
 https://pkg.go.dev/text/template
 
+## Supported Platforms
+
+Windows is not supported. Only Linux and macOS are supported. PRs are welcome to add support for windows
+
 ## TODO
--  HTTP listener to trigger agent reloads over an HTTP endpoint
+
+- HTTP listener to trigger agent reloads over an HTTP endpoint
 - Observability
+

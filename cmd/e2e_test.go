@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"github.com/shubhang93/tplagent/internal/config"
@@ -157,9 +158,54 @@ func Test_With_HTTPLis(t *testing.T) {
 	}
 	_ = f.Close()
 
-	err = startCLI(context.Background(), os.Stdout, []string{"start", "-config", configPath}...)
+	cliErr := make(chan error)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	go func() {
+		cliErr <- startCLI(ctx, os.Stdout, []string{"start", "-config", configPath}...)
+
+	}()
+
+	cfg.TemplateSpecs["server-conf"] = &config.TemplateSpec{
+		Raw:             "PORT: {{.Port}}",
+		Destination:     tmp + "/server.conf",
+		StaticData:      map[string]any{"Port": "9090"},
+		RefreshInterval: duration.Duration(2 * time.Second),
+	}
+
+	reloadReq := map[string]any{
+		"config":      cfg,
+		"config_path": configPath,
+	}
+
+	var buff bytes.Buffer
+	err = json.NewEncoder(&buff).Encode(reloadReq)
 	if err != nil {
 		t.Error(err)
+	}
+
+	resp, err := http.Post("http://localhost:6000/config/reload", "application/json", &buff)
+	if err != nil {
+		t.Error(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected status code %d got %d", http.StatusOK, resp.StatusCode)
+	}
+
+	if err := <-cliErr; err != nil {
+		t.Errorf("CLI err %v", err)
+	}
+
+	bs, err := os.ReadFile(tmp + "/server.conf")
+	if err != nil {
+		t.Error(err)
+	}
+
+	serverConf := string(bs)
+	const expected = "PORT: 9090"
+	if serverConf != expected {
+		t.Errorf("expected %s got %s", expected, serverConf)
 	}
 }
 

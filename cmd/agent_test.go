@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/shubhang93/tplagent/internal/config"
+	"github.com/shubhang93/tplagent/internal/fatal"
 	"log/slog"
 	"os"
 	"sync/atomic"
@@ -31,6 +33,15 @@ func Test_reloadProcs(t *testing.T) {
 			AtleastReloadNTimes: 8,
 			AgentErr: func(num int32) error {
 				return fmt.Errorf("agent error %d", num)
+			},
+		},
+		"with fatal error": {
+			AtleastReloadNTimes: 3,
+			AgentErr: func(num int32) error {
+				if num > 3 {
+					return fatal.NewError(errors.New("fatal error"))
+				}
+				return nil
 			},
 		},
 	}

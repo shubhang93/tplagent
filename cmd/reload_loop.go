@@ -27,17 +27,18 @@ func reloadProcs(root context.Context, configPath string, starters procStarters)
 		return err
 	}
 
-	lisDone := make(chan struct{})
+	var serverWG sync.WaitGroup
+	serverWG.Add(1)
 	go func() {
-		defer close(lisDone)
+		defer serverWG.Done()
 		_ = starters.listener(ctx, conf, false)
 	}()
 
-	errCh := make(chan error, 1)
+	agentErrCh := make(chan error, 1)
 	var agentWG sync.WaitGroup
 	agentWG.Add(1)
 	go func() {
-		errCh <- starters.agent(ctx, conf, false)
+		agentErrCh <- starters.agent(ctx, conf, false)
 		agentWG.Done()
 	}()
 
@@ -46,16 +47,27 @@ func reloadProcs(root context.Context, configPath string, starters procStarters)
 		select {
 		case <-sighup:
 			cancel(sighupReceived)
-			<-lisDone
+			serverWG.Wait()
 			agentWG.Wait()
 
+			newConf, err := config.ReadFromFile(configPath)
+			if err != nil {
+				return err
+			}
 			ctx, cancel = context.WithCancelCause(root)
+
+			serverWG.Add(1)
+			go func() {
+				_ = starters.listener(ctx, conf, true)
+				serverWG.Done()
+			}()
+
 			agentWG.Add(1)
 			go func() {
-				errCh <- starters.agent(ctx, conf, true)
+				agentErrCh <- starters.agent(ctx, newConf, true)
 				agentWG.Done()
 			}()
-		case err := <-errCh:
+		case err := <-agentErrCh:
 			agentWG.Wait()
 			lastAgentErr = err
 			if fatal.Is(err) {
@@ -63,7 +75,7 @@ func reloadProcs(root context.Context, configPath string, starters procStarters)
 				return err
 			}
 		case <-ctx.Done():
-			<-lisDone
+			serverWG.Wait()
 			agentWG.Wait()
 			return lastAgentErr
 		}

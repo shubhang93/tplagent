@@ -28,7 +28,7 @@ type Server struct {
 func (s *Server) Start(ctx context.Context, addr string) {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("POST /config/reload", reloadConfig)
+	mux.HandleFunc("POST /config/reload", s.reloadConfig)
 
 	srvr := http.Server{Handler: mux, Addr: addr}
 
@@ -45,12 +45,19 @@ func (s *Server) Start(ctx context.Context, addr string) {
 		_ = srvr.Shutdown(shutdownCtx)
 	}()
 
+	if s.Reloaded {
+		s.Logger.Info("reloading http listener", slog.String("addr", addr))
+	} else {
+		s.Logger.Info("starting http listener", slog.String("addr", addr))
+	}
+
 	err := srvr.ListenAndServe()
 	if !errors.Is(err, http.ErrServerClosed) && err != nil {
 		s.Logger.Error("ListenAndServe error", slog.String("error", err.Error()))
 	}
 
 	<-wait
+	s.Logger.Info("http listener exited without errors")
 
 }
 
@@ -60,7 +67,7 @@ func writeJSON(writer http.ResponseWriter, status int, data any) {
 	return
 }
 
-func reloadConfig(writer http.ResponseWriter, request *http.Request) {
+func (s *Server) reloadConfig(writer http.ResponseWriter, request *http.Request) {
 
 	proc, err := os.FindProcess(os.Getpid())
 	if err != nil {
@@ -95,6 +102,8 @@ func reloadConfig(writer http.ResponseWriter, request *http.Request) {
 		writeJSON(writer, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
+
+	s.Logger.Info("wrote new config", slog.String("path", configFilePath))
 
 	err = proc.Signal(syscall.SIGHUP)
 	if err != nil {
