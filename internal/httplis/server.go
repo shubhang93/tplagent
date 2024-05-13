@@ -132,7 +132,7 @@ func (p *Proc) reloadConfig(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	p.Logger.Info("reload triggerred")
+	p.Logger.Info("http reload triggerred")
 	writeJSON(writer, http.StatusOK, map[string]bool{"success": true})
 
 }
