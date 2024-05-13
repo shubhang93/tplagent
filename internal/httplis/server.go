@@ -20,7 +20,7 @@ type reloadRequest struct {
 	ConfigPath string          `json:"config_path"`
 }
 
-type Server struct {
+type Proc struct {
 	Logger   *slog.Logger
 	Reloaded bool
 }
@@ -28,11 +28,11 @@ type Server struct {
 const reloadEndpoint = "POST /config/reload"
 const stopAgent = "POST /agent/stop"
 
-func (s *Server) Start(ctx context.Context, addr string) {
+func (p *Proc) Start(ctx context.Context, addr string) {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc(reloadEndpoint, s.reloadConfig)
-	mux.HandleFunc(stopAgent, s.stopAgent)
+	mux.HandleFunc(reloadEndpoint, p.reloadConfig)
+	mux.HandleFunc(stopAgent, p.stopAgent)
 
 	srvr := http.Server{Handler: mux, Addr: addr}
 
@@ -46,24 +46,24 @@ func (s *Server) Start(ctx context.Context, addr string) {
 		_ = srvr.Shutdown(shutdownCtx)
 	}()
 
-	if s.Reloaded {
-		s.Logger.Info("reloading http listener", slog.String("addr", addr))
+	if p.Reloaded {
+		p.Logger.Info("reloading http listener", slog.String("addr", addr))
 	} else {
-		s.Logger.Info("starting http listener", slog.String("addr", addr))
+		p.Logger.Info("starting http listener", slog.String("addr", addr))
 	}
 
 	err := srvr.ListenAndServe()
 	if !errors.Is(err, http.ErrServerClosed) && err != nil {
-		s.Logger.Error("ListenAndServe error", slog.String("error", err.Error()))
+		p.Logger.Error("ListenAndServe error", slog.String("error", err.Error()))
 	}
 
 	<-wait
-	s.Logger.Info("http listener exited without errors")
+	p.Logger.Info("http listener exited without errors")
 
 }
 
-func (s *Server) stopAgent(writer http.ResponseWriter, _ *http.Request) {
-	s.Logger.Info("stopping agent", slog.String("cause", "http stop triggerred"))
+func (p *Proc) stopAgent(writer http.ResponseWriter, _ *http.Request) {
+	p.Logger.Info("stopping agent", slog.String("cause", "http stop triggerred"))
 	proc, err := os.FindProcess(os.Getpid())
 	if err != nil {
 		writeJSON(writer, http.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -86,7 +86,7 @@ func writeJSON(writer http.ResponseWriter, status int, data any) {
 	return
 }
 
-func (s *Server) reloadConfig(writer http.ResponseWriter, request *http.Request) {
+func (p *Proc) reloadConfig(writer http.ResponseWriter, request *http.Request) {
 
 	proc, err := os.FindProcess(os.Getpid())
 	if err != nil {
@@ -105,7 +105,7 @@ func (s *Server) reloadConfig(writer http.ResponseWriter, request *http.Request)
 	_, err = os.Stat(configFilePath)
 	if errors.Is(err, os.ErrNotExist) {
 		writeJSON(writer, http.StatusNotFound, map[string]string{
-			"error": fmt.Sprintf("file not found at %s", configFilePath),
+			"error": fmt.Sprintf("file not found at %p", configFilePath),
 		})
 		return
 	}
@@ -122,7 +122,7 @@ func (s *Server) reloadConfig(writer http.ResponseWriter, request *http.Request)
 		return
 	}
 
-	s.Logger.Info("wrote new config")
+	p.Logger.Info("wrote new config")
 
 	err = proc.Signal(syscall.SIGHUP)
 	if err != nil {

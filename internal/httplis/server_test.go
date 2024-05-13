@@ -112,7 +112,7 @@ func TestStart(t *testing.T) {
 				}
 			}()
 
-			server := Server{Logger: newLogger()}
+			server := Proc{Logger: newLogger()}
 
 			wg.Add(1)
 			go func() {
@@ -143,7 +143,7 @@ func TestStart(t *testing.T) {
 	}
 
 	t.Run("stop endpoint", func(t *testing.T) {
-		s := Server{
+		s := Proc{
 			Logger:   newLogger(),
 			Reloaded: false,
 		}

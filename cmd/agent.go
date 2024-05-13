@@ -36,7 +36,7 @@ func spawnAndReload(rootCtx context.Context, configPath string) error {
 			if conf.Agent.HTTPListenerAddr != "" {
 				logFmt := conf.Agent.LogFmt
 				level := conf.Agent.LogLevel
-				s := httplis.Server{
+				s := httplis.Proc{
 					Logger:   newLogger(logFmt, level).WithGroup("http-lis"),
 					Reloaded: reload,
 				}
@@ -47,7 +47,7 @@ func spawnAndReload(rootCtx context.Context, configPath string) error {
 		agent: func(ctx context.Context, conf config.TPLAgent, reload bool) error {
 			logFmt := conf.Agent.LogFmt
 			level := conf.Agent.LogLevel
-			proc := agent.Process{
+			proc := agent.Proc{
 				Logger:   newLogger(logFmt, level).WithGroup("agent"),
 				TickFunc: agent.RenderAndExec,
 				Reloaded: reload,

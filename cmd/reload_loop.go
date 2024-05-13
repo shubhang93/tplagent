@@ -88,6 +88,11 @@ func reloadProcs(root context.Context, configPath string, starters procStarters)
 func launchAgent(ctx context.Context, lf launcherFunc, conf config.TPLAgent, reloaded bool, errCh chan<- error) {
 	err := lf(ctx, conf, reloaded)
 	errCh <- err
+	// channel is closed
+	// so that only one of
+	// select cases can read the error
+	// and the second read returns
+	// immediately
 	close(errCh)
 }
 

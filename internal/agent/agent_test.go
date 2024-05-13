@@ -174,7 +174,7 @@ func Test_renderLoop(t *testing.T) {
 				return nil
 			}
 
-			p := Process{
+			p := Proc{
 				Logger:            newLogger(),
 				maxConsecFailures: 10,
 				TickFunc:          onTick,
@@ -191,7 +191,7 @@ func Test_renderLoop(t *testing.T) {
 	}
 
 	t.Run("test consec failures", func(t *testing.T) {
-		proc := &Process{
+		proc := &Proc{
 			Logger: newLogger(),
 			TickFunc: func(ctx context.Context, _ Renderer, _ CMDExecer, _ any) error {
 				return errors.New("error occurred")
@@ -214,7 +214,7 @@ func Test_renderLoop(t *testing.T) {
 	t.Run("reset consec failures reset", func(t *testing.T) {
 
 		tickCount := 0
-		proc := Process{
+		proc := Proc{
 			TickFunc: func(ctx context.Context, _ Renderer, _ CMDExecer, _ any) error {
 				tickCount++
 				switch tickCount {
@@ -249,7 +249,7 @@ func Test_renderLoop(t *testing.T) {
 
 	t.Run("init template", func(t *testing.T) {
 
-		p := Process{Logger: newLogger()}
+		p := Proc{Logger: newLogger()}
 
 		err := p.initTemplate(&sinkExecConfig{
 			sinkConfig: sinkConfig{
@@ -288,7 +288,7 @@ func Test_renderLoop(t *testing.T) {
 		tf := tickFunc(func(ctx context.Context, _ Renderer, _ CMDExecer, _ any) error {
 			return nil
 		})
-		p := Process{
+		p := Proc{
 			Logger:   newLogger(),
 			configs:  scs,
 			TickFunc: tf,
@@ -370,7 +370,7 @@ func Test_renderLoop(t *testing.T) {
 			mu.Unlock()
 			return nil
 		})
-		p := Process{
+		p := Proc{
 			Logger:            newLogger(),
 			configs:           configs,
 			maxConsecFailures: 10,
@@ -414,7 +414,7 @@ func Test_renderLoop(t *testing.T) {
 
 	t.Run("all configs render once", func(t *testing.T) {
 		tmp := t.TempDir()
-		p := Process{
+		p := Proc{
 			Logger:   newLogger(),
 			TickFunc: RenderAndExec,
 			configs: []sinkExecConfig{{

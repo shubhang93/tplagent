@@ -60,7 +60,7 @@ type execConfig struct {
 	env     map[string]string
 }
 
-type Process struct {
+type Proc struct {
 	Logger            *slog.Logger
 	TickFunc          tickFunc
 	configs           []sinkExecConfig
@@ -68,7 +68,7 @@ type Process struct {
 	maxConsecFailures int
 }
 
-func (p *Process) Start(ctx context.Context, config config.TPLAgent) error {
+func (p *Proc) Start(ctx context.Context, config config.TPLAgent) error {
 
 	if p.Reloaded {
 		p.Logger.Info("agent reloading")
@@ -127,7 +127,7 @@ func (t templInitErr) Error() string {
 	return fmt.Sprintf("template init error for %s:%s", t.name, t.err.Error())
 }
 
-func (p *Process) startTickLoops(ctx context.Context) error {
+func (p *Proc) startTickLoops(ctx context.Context) error {
 	var wg sync.WaitGroup
 	errsChan := make(chan error)
 
@@ -174,7 +174,7 @@ func (p *Process) startTickLoops(ctx context.Context) error {
 	return errors.Join(loopErrs...)
 }
 
-func (p *Process) initTemplate(sc *sinkExecConfig) error {
+func (p *Proc) initTemplate(sc *sinkExecConfig) error {
 	at := actionable.NewTemplate(sc.name, sc.html)
 	at.SetMissingKeyBehaviour(sc.missingKey)
 	setTemplateDelims(at, sc.templateDelims)
@@ -185,7 +185,7 @@ func (p *Process) initTemplate(sc *sinkExecConfig) error {
 	return parseTemplate(sc.raw, sc.readFrom, sc.parsed)
 }
 
-func (p *Process) startRenderLoop(ctx context.Context, cfg sinkExecConfig) error {
+func (p *Proc) startRenderLoop(ctx context.Context, cfg sinkExecConfig) error {
 
 	p.Logger.Info("starting refresh loop", slog.String("templ", cfg.name))
 	sink := render.Sink{
