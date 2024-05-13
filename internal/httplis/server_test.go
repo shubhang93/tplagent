@@ -148,6 +148,16 @@ func TestStart(t *testing.T) {
 			Reloaded: false,
 		}
 
+		sigint := make(chan os.Signal, 1)
+		signal.Notify(sigint, syscall.SIGINT)
+
+		sigintRcvd := make(chan bool)
+
+		go func() {
+			<-sigint
+			sigintRcvd <- true
+		}()
+
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
@@ -168,7 +178,9 @@ func TestStart(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("req failed with status %d", resp.StatusCode)
 		}
-
+		if rcvd := <-sigintRcvd; !rcvd {
+			t.Error("SIGINT was not received")
+		}
 	})
 
 }
