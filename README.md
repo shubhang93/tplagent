@@ -1,6 +1,6 @@
 # tplagent
 
-TPLAgent is an agent for rendering Go templates into meaningful entities ( like config files, HTML views, etc... ).
+TPLAgent is template rendering agent which periodically renders your templates by running actions against the templates
 The agent periodically renders your templates based on a simple JSON config
 
 - Offers a user-friendly CLI to control the agent
@@ -39,7 +39,7 @@ and files created by `tplagent` use the `766` permissions. It is also recommende
 as
 part of setting up the agent to avoid permission errors.
 
-## Reloading the agent
+## Reloading the agent via the shell
 
 Agent can be reloaded by sending a SIGHUP signal to the agent process, if the agent process starts up successfully the
 PID is stored inside
@@ -53,6 +53,38 @@ PID is stored inside
    ```
 
 3 ) A future CLI command will be added to reload the process using `tplagent reload`
+
+## Reloading the agent via HTTP listener
+
+Agent can be reloaded via the HTTP listener, enable the HTTP listener in the agent config
+
+```json5
+{
+  "agent": {
+    "log_level": "INFO",
+    // ....
+    "http_listener": "localhost:6000",
+    // a blank value disables the listener
+  },
+  "templates": {
+    // ....
+  }
+}
+```
+
+- Reload the agent by issuing an `HTTP POST` request
+
+```shell
+curl -X POST --data {"config_path": "/tmp/tplagent/config.json","config": {"agent": {...},"templates": {...}}} "localhost:6000/config/reload"
+```
+
+expected response `{"success":true}`
+
+- Kill the agent using the `/agent/stop` endpoint
+```shell
+curl -X POST "localhost:6000/agent/stop"
+
+```
 
 ## Configuration explained
 
@@ -205,6 +237,5 @@ Windows is not supported. Only Linux and macOS are supported. PRs are welcome to
 
 ## TODO
 
-- HTTP listener to trigger agent reloads over an HTTP endpoint
 - Observability
 
