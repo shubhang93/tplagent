@@ -25,10 +25,14 @@ type Server struct {
 	Reloaded bool
 }
 
+const reloadEndpoint = "POST /config/reload"
+const stopAgent = "POST /agent/stop"
+
 func (s *Server) Start(ctx context.Context, addr string) {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("POST /config/reload", s.reloadConfig)
+	mux.HandleFunc(reloadEndpoint, s.reloadConfig)
+	mux.HandleFunc(stopAgent, s.stopAgent)
 
 	srvr := http.Server{Handler: mux, Addr: addr}
 
@@ -37,8 +41,7 @@ func (s *Server) Start(ctx context.Context, addr string) {
 		defer close(wait)
 
 		<-ctx.Done()
-
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
 		_ = srvr.Shutdown(shutdownCtx)
 	}()
@@ -56,6 +59,24 @@ func (s *Server) Start(ctx context.Context, addr string) {
 
 	<-wait
 	s.Logger.Info("http listener exited without errors")
+
+}
+
+func (s *Server) stopAgent(writer http.ResponseWriter, _ *http.Request) {
+	s.Logger.Info("stopping agent", slog.String("cause", "http stop triggerred"))
+	proc, err := os.FindProcess(os.Getpid())
+	if err != nil {
+		writeJSON(writer, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	err = proc.Signal(syscall.SIGINT)
+	if err != nil {
+		writeJSON(writer, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	writeJSON(writer, http.StatusOK, map[string]bool{"success": true})
 
 }
 
