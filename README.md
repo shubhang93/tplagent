@@ -36,55 +36,7 @@ It is much easier to reload the agent.
 
 It is recommended that the `tplagent` process is started under a dedicated user meant for `tplagent`. All directories
 and files created by `tplagent` use the `766` permissions. It is also recommended to set the right directory permissions
-as
-part of setting up the agent to avoid permission errors.
-
-## Reloading the agent via the shell
-
-Agent can be reloaded by sending a SIGHUP signal to the agent process, if the agent process starts up successfully the
-PID is stored inside
-`/tmp/tplagent/agent.pid`. Agent reloading can be useful to read new config. For example
-
-1) Edit the agent config file and save it
-2) Locate the PID file
-   ```shell
-   PID=$(cat /tmp/tplagent/agent.pid)
-   kill -1 $PID
-   ```
-
-3 ) A future CLI command will be added to reload the process using `tplagent reload`
-
-## Reloading the agent via HTTP listener
-
-Agent can be reloaded via the HTTP listener, enable the HTTP listener in the agent config
-
-```json5
-{
-  "agent": {
-    "log_level": "INFO",
-    // ....
-    "http_listener": "localhost:6000",
-    // a blank value disables the listener
-  },
-  "templates": {
-    // ....
-  }
-}
-```
-
-- Reload the agent by issuing an `HTTP POST` request
-
-```shell
-curl -X POST --data {"config_path": "/tmp/tplagent/config.json","config": {"agent": {...},"templates": {...}}} "localhost:6000/config/reload"
-```
-
-expected response `{"success":true}`
-
-- Kill the agent using the `/agent/stop` endpoint
-```shell
-curl -X POST "localhost:6000/agent/stop"
-
-```
+as part of setting up the agent to avoid permission errors.
 
 ## Configuration explained
 
@@ -97,7 +49,9 @@ curl -X POST "localhost:6000/agent/stop"
     "log_fmt": "text",
     // set max consecutive failures for command execution and 
     // template execution
-    "max_consecutive_failures": 10
+    "max_consecutive_failures": 10,
+    // enable the http listener
+    "http_listener": "localhost:6000"
   },
   "templates": {
     "nginx-conf": {
@@ -179,8 +133,9 @@ curl -X POST "localhost:6000/agent/stop"
 What makes `tplagent` dynamic and extensible are the actions. Actions are just plain functions you can call in your
 templates to perform certain actions. Their main utility is to fetch data from different sources. New actions can be
 added to `tplagent`, which will be covered later. An action is just a collection of functions which can be used in your
-template file. You can include multiple actions in a single template, to invoke a certain actions in the template, it's
-corresponding action must be included in the `"actions"` section of the template config.
+template file. You can include multiple actions in a single template. To invoke a certain action set in the template,
+it's corresponding action must be included in the `"actions"` section of the template config. Each of the action, has
+its own README section. Refer to `internal/tplactions/<action_name>` for docs.
 
 ### How to invoke a certain action
 
@@ -213,7 +168,6 @@ Prerequisites:
 
 - Understanding of the Golang language and how interfaces work in Golang.
 - Understanding of the `init` function in Golang and the `_` import.
-
 - There is just one action included with the agent currently, any new action requires the agent to be rebuilt as all
   actions get packaged in the same binary.
 - All actions follow the `tplactions.Interface`. Each action must be created in its own package and the config for each
@@ -230,6 +184,54 @@ We want to include actions which can be used by most people.
 ## On How to use Go templates properly please refer to
 
 https://pkg.go.dev/text/template
+
+## Reloading the agent via the shell
+
+Agent can be reloaded by sending a SIGHUP signal to the agent process, if the agent process starts up successfully the
+PID is stored inside
+`/tmp/tplagent/agent.pid`. Agent reloading can be useful to read new config. For example
+
+1) Edit the agent config file and save it
+2) Locate the PID file
+   ```shell
+   PID=$(cat /tmp/tplagent/agent.pid)
+   kill -1 $PID
+   ```
+
+3 ) A future CLI command will be added to reload the process using `tplagent reload`
+
+## Reloading the agent via HTTP listener
+
+Agent can be reloaded via the HTTP listener, enable the HTTP listener in the agent config
+
+```json5
+{
+  "agent": {
+    "log_level": "INFO",
+    // ....
+    "http_listener": "localhost:6000",
+    // a blank value disables the listener
+  },
+  "templates": {
+    // ....
+  }
+}
+```
+
+- Reload the agent by issuing an `HTTP POST` request
+
+```shell
+curl -X POST --data {"config_path": "/tmp/tplagent/config.json","config": {"agent": {...},"templates": {...}}} "localhost:6000/config/reload"
+```
+
+expected response `{"success":true}`
+
+- Kill the agent using the `/agent/stop` endpoint
+
+```shell
+curl -X POST "localhost:6000/agent/stop"
+
+```
 
 ## Supported Platforms
 
