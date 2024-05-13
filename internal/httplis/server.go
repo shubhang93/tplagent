@@ -104,7 +104,7 @@ func (p *Proc) reloadConfig(writer http.ResponseWriter, request *http.Request) {
 	_, err = os.Stat(configFilePath)
 	if errors.Is(err, os.ErrNotExist) {
 		writeJSON(writer, http.StatusNotFound, map[string]string{
-			"error": fmt.Sprintf("file not found at %p", configFilePath),
+			"error": fmt.Sprintf("file not found at %s", configFilePath),
 		})
 		return
 	}
