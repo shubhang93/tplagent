@@ -119,6 +119,7 @@ func TestStart(t *testing.T) {
 				server.Start(ctx, "localhost:6000")
 			}()
 
+			time.Sleep(100 * time.Millisecond)
 			rdr := strings.NewReader(rt.jsonBody(tmp))
 			resp, err := http.Post("http://localhost:6000/config/reload", "application/json", rdr)
 			if err != nil {

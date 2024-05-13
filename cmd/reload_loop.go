@@ -6,13 +6,14 @@ import (
 	"github.com/shubhang93/tplagent/internal/fatal"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 )
 
+type launcherFunc func(ctx context.Context, conf config.TPLAgent, reload bool) error
+
 type procStarters struct {
-	listener func(ctx context.Context, conf config.TPLAgent, reload bool) error
-	agent    func(ctx context.Context, conf config.TPLAgent, reload bool) error
+	listener launcherFunc
+	agent    launcherFunc
 }
 
 func reloadProcs(root context.Context, configPath string, starters procStarters) error {
@@ -27,57 +28,70 @@ func reloadProcs(root context.Context, configPath string, starters procStarters)
 		return err
 	}
 
-	var serverWG sync.WaitGroup
-	serverWG.Add(1)
-	go func() {
-		defer serverWG.Done()
-		_ = starters.listener(ctx, conf, false)
-	}()
+	serverDone := make(chan struct{}, 1)
+	go launchListener(ctx, starters.listener, conf, false, serverDone)
 
 	agentErrCh := make(chan error, 1)
-	var agentWG sync.WaitGroup
-	agentWG.Add(1)
-	go func() {
-		agentErrCh <- starters.agent(ctx, conf, false)
-		agentWG.Done()
-	}()
+	go launchAgent(ctx, starters.agent, conf, false, agentErrCh)
 
-	var lastAgentErr error
 	for {
 		select {
 		case <-sighup:
 			cancel(sighupReceived)
-			serverWG.Wait()
-			agentWG.Wait()
 
-			newConf, err := config.ReadFromFile(configPath)
+			// wait for err from the
+			// last agent goroutine
+			err := <-agentErrCh
+			if fatal.Is(err) {
+				// agent had a fatal error
+				// exit the loop
+				<-serverDone
+				return err
+			}
+
+			// wait for server to exit
+			<-serverDone
+
+			// reset all the sync
+			// primitives
+
+			ctx, cancel = context.WithCancelCause(root)
+			conf, err := config.ReadFromFile(configPath)
 			if err != nil {
 				return err
 			}
-			ctx, cancel = context.WithCancelCause(root)
 
-			serverWG.Add(1)
-			go func() {
-				_ = starters.listener(ctx, conf, true)
-				serverWG.Done()
-			}()
+			go launchListener(ctx, starters.listener, conf, true, serverDone)
 
-			agentWG.Add(1)
-			go func() {
-				agentErrCh <- starters.agent(ctx, newConf, true)
-				agentWG.Done()
-			}()
+			agentErrCh = make(chan error, 1)
+			go launchAgent(ctx, starters.agent, conf, true, agentErrCh)
 		case err := <-agentErrCh:
-			agentWG.Wait()
-			lastAgentErr = err
 			if fatal.Is(err) {
 				cancel(err)
+				// wait for server and
+				// exit
+				<-serverDone
 				return err
 			}
+			// for non-fatal errors
+			// server goroutine
+			// is kept running
+			// to allow reloads
 		case <-ctx.Done():
-			serverWG.Wait()
-			agentWG.Wait()
-			return lastAgentErr
+			err := <-agentErrCh
+			<-serverDone
+			return err
 		}
 	}
+}
+
+func launchAgent(ctx context.Context, lf launcherFunc, conf config.TPLAgent, reloaded bool, errCh chan<- error) {
+	err := lf(ctx, conf, reloaded)
+	errCh <- err
+	close(errCh)
+}
+
+func launchListener(ctx context.Context, lf launcherFunc, conf config.TPLAgent, reloaded bool, doneCh chan<- struct{}) {
+	_ = lf(ctx, conf, reloaded)
+	doneCh <- struct{}{}
 }

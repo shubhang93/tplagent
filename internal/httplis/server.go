@@ -36,9 +36,7 @@ func (s *Server) Start(ctx context.Context, addr string) {
 	go func() {
 		defer close(wait)
 
-		select {
-		case <-ctx.Done():
-		}
+		<-ctx.Done()
 
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()
@@ -103,7 +101,7 @@ func (s *Server) reloadConfig(writer http.ResponseWriter, request *http.Request)
 		return
 	}
 
-	s.Logger.Info("wrote new config", slog.String("path", configFilePath))
+	s.Logger.Info("wrote new config")
 
 	err = proc.Signal(syscall.SIGHUP)
 	if err != nil {

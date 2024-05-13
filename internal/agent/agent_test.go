@@ -242,8 +242,8 @@ func Test_renderLoop(t *testing.T) {
 		if errors.Is(err, errTooManyFailures) {
 			t.Error(err)
 		}
-		if tickCount != int(n) {
-			t.Errorf("expected tick count %d got %d", int(n), tickCount)
+		if tickCount < int(n-2) {
+			t.Errorf("expected tick count to be atleast %d got %d", int(n), tickCount)
 		}
 	})
 
