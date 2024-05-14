@@ -191,14 +191,8 @@ Agent can be reloaded by sending a SIGHUP signal to the agent process, if the ag
 PID is stored inside
 `/tmp/tplagent/agent.pid`. Agent reloading can be useful to read new config. For example
 
-1) Edit the agent config file and save it
-2) Locate the PID file
-   ```shell
-   PID=$(cat /tmp/tplagent/agent.pid)
-   kill -1 $PID
-   ```
-
-3 ) A future CLI command will be added to reload the process using `tplagent reload`
+To reload the agent run
+`tplagent reload`
 
 ## Reloading the agent via HTTP listener
 
