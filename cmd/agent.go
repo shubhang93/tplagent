@@ -20,8 +20,7 @@ const pidDir = "/tmp/tplagent"
 const pidFilename = "agent.pid"
 
 func startAgent(ctx context.Context, configFilePath string) error {
-	pid := os.Getpid()
-	writePID(pid)
+	writePID(filepath.Join(pidDir, pidFilename))
 	defer func() {
 		_ = os.Remove(fmt.Sprintf("%s/%s", pidDir, pidFilename))
 	}()
@@ -78,11 +77,11 @@ func newLogger(fmt string, level slog.Level) *slog.Logger {
 
 }
 
-func writePID(pid int) {
+func writePID(path string) {
+	pid := os.Getpid()
 	if err := os.MkdirAll(pidDir, 0755); err != nil {
 		return
 	}
-	fullPath := filepath.Join(pidDir, pidFilename)
 	bs := []byte(strconv.Itoa(pid))
-	_ = os.WriteFile(fullPath, bs, 0755)
+	_ = os.WriteFile(path, bs, 0755)
 }

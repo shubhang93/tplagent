@@ -7,8 +7,12 @@ import (
 	"fmt"
 	"github.com/shubhang93/tplagent/internal/config"
 	"io"
+	"os"
+	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
+	"syscall"
 )
 
 const usage = `usage:
@@ -69,9 +73,34 @@ Go Runtime: %s`
 		if err != nil {
 			return err
 		}
+	case "reload":
+		pidFilePath := filepath.Join(pidDir, pidFilename)
+		return reload(pidFilePath)
 	default:
 		return errors.New(usage)
 	}
 	return nil
+}
 
+func reload(pidFilePath string) error {
+	contents, err := os.ReadFile(pidFilePath)
+	if err != nil {
+		return err
+	}
+
+	pid, err := strconv.Atoi(string(contents))
+	if err != nil {
+		return fmt.Errorf("error converting PID:%w", err)
+	}
+
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return fmt.Errorf("proc find err:%w", err)
+	}
+
+	err = proc.Signal(syscall.SIGHUP)
+	if err != nil {
+		return fmt.Errorf("sig send err:%w", err)
+	}
+	return nil
 }

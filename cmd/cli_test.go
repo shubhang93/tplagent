@@ -12,7 +12,9 @@ import (
 	"github.com/shubhang93/tplagent/internal/fatal"
 	"log/slog"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -205,5 +207,31 @@ written from exec
 			t.Error(diff)
 		}
 
+	})
+
+	t.Run("test reload", func(t *testing.T) {
+		tmp := t.TempDir()
+		sighup, cancel := signal.NotifyContext(context.Background(), syscall.SIGHUP)
+		defer cancel()
+
+		sighupReceived := make(chan bool, 1)
+		go func() {
+			<-sighup.Done()
+			sighupReceived <- true
+		}()
+
+		pidPath := tmp + "/agent.pid"
+
+		writePID(pidPath)
+
+		err := reload(pidPath)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+
+		if rcvd := <-sighupReceived; !rcvd {
+			t.Errorf("SIGHUP not received")
+		}
 	})
 }
