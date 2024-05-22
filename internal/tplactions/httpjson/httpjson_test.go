@@ -93,9 +93,53 @@ func Test_Actions(t *testing.T) {
 		if diff != "" {
 			t.Error(diff)
 		}
-
 	})
+}
 
+func Test_Actions_Auth(t *testing.T) {
+	t.Run("basic auth", func(t *testing.T) {
+		a := Actions{Conf: Config{Auth: &Auth{
+			BasicAuth: map[string]string{"username": "foo", "password": "bar"},
+		}}}
+		req, err := a.newRequest("/foo", http.MethodGet, nil)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		user, pass, ok := req.BasicAuth()
+		if !ok {
+			t.Error("setting basic auth failed")
+			return
+		}
+		if user != "foo" {
+			t.Error("invalid user")
+			return
+		}
+		if pass != "bar" {
+			t.Error("invalid password")
+		}
+	})
+	t.Run("bearer auth", func(t *testing.T) {
+		token := "Bearer foo"
+		a := Actions{Conf: Config{Auth: &Auth{
+			BasicAuth:   map[string]string{},
+			BearerToken: (*BearerToken)(&token),
+		}}}
+		req, err := a.newRequest("/foo", http.MethodGet, nil)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		_, _, ok := req.BasicAuth()
+		if ok {
+			t.Error("basic auth should not be set")
+			return
+		}
+		authHeader := req.Header.Get("Authorization")
+		if authHeader != "Bearer foo" {
+			t.Error("invalid authorization header")
+		}
+	})
 }
 
 func startMockServer() {

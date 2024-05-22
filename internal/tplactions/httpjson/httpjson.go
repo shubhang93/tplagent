@@ -9,7 +9,9 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"slices"
+	"strings"
 	"text/template"
 	"time"
 )
@@ -25,12 +27,17 @@ type Config struct {
 	BaseURL       string            `json:"base_url"`
 	Auth          *Auth             `json:"auth"`
 	Timeout       duration.Duration `json:"timeout"`
+	Headers       map[string]string `json:"headers"`
 	ErrorStatuses []int             `json:"error_statuses"`
 }
 
+type httpDoer interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 type Actions struct {
-	*http.Client
-	Conf Config
+	Client httpDoer
+	Conf   Config
 }
 
 func (a *Actions) SetLogger(_ *slog.Logger) {}
@@ -40,7 +47,13 @@ func (a *Actions) getAndReadBody(endpoint string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp, err := a.Client.Get(fullURL)
+
+	if strings.HasPrefix("http://", endpoint) || strings.HasPrefix("https://", endpoint) {
+		fullURL = endpoint
+	}
+
+	req, err := a.newRequest(fullURL, http.MethodGet, nil)
+	resp, err := a.Client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -99,8 +112,39 @@ func (a *Actions) SetConfig(bs []byte) error {
 	return nil
 }
 
-func (a *Actions) Close() {
-	a.Client.CloseIdleConnections()
+func (a *Actions) Close() {}
+
+func (a *Actions) newRequest(url string, method string, body io.Reader) (*http.Request, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	if a.Conf.Auth != nil {
+		setAuth(req, a.Conf.Auth)
+	}
+
+	if a.Conf.Headers != nil {
+		setHeaders(req, a.Conf.Headers)
+	}
+
+	return req, nil
+}
+
+func setAuth(r *http.Request, a *Auth) {
+	if a.BasicAuth != nil && len(a.BasicAuth) > 0 {
+		uname, pswd := a.BasicAuth["username"], a.BasicAuth["password"]
+		r.SetBasicAuth(os.ExpandEnv(uname), os.ExpandEnv(pswd))
+		return
+	}
+	if a.BearerToken != nil {
+		r.Header.Set("Authorization", string(*a.BearerToken))
+	}
+}
+
+func setHeaders(r *http.Request, hs map[string]string) {
+	for k, v := range hs {
+		r.Header.Set(os.ExpandEnv(k), os.ExpandEnv(v))
+	}
 }
 
 func init() {
