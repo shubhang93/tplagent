@@ -1,6 +1,6 @@
 # tplagent
 
-TPLAgent is template rendering agent which periodically renders your templates by running actions against the templates
+TPLAgent is template rendering agent which atomically renders your templates at specified intervals by running custom actions against the templates
 The agent periodically renders your templates based on a simple JSON config
 
 - Offers a user-friendly CLI to control the agent
