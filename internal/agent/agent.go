@@ -39,18 +39,19 @@ var errTooManyFailures = errors.New("too many failures")
 type tickFunc func(ctx context.Context, sink Renderer, execer CMDExecer, staticData any) error
 
 type sinkConfig struct {
-	parsed          *actionable.Template
-	refreshInterval time.Duration
-	html            bool
-	templateDelims  []string
-	actions         []config.Actions
-	dest            string
-	staticData      any
-	name            string
-	renderOnce      bool
-	raw             string
-	readFrom        string
-	missingKey      string
+	parsed           *actionable.Template
+	refreshInterval  time.Duration
+	refreshOnTrigger bool
+	html             bool
+	templateDelims   []string
+	actions          []config.Actions
+	dest             string
+	staticData       any
+	name             string
+	renderOnce       bool
+	raw              string
+	readFrom         string
+	missingKey       string
 }
 
 type execConfig struct {
@@ -90,17 +91,18 @@ func sanitizeConfigs(templConfig map[string]*config.TemplateSpec) []sinkExecConf
 		specTempl := templConfig[name]
 		scs[i] = sinkExecConfig{
 			sinkConfig: sinkConfig{
-				refreshInterval: time.Duration(specTempl.RefreshInterval),
-				html:            specTempl.HTML,
-				templateDelims:  specTempl.TemplateDelimiters,
-				actions:         specTempl.Actions,
-				readFrom:        os.ExpandEnv(specTempl.Source),
-				dest:            os.ExpandEnv(specTempl.Destination),
-				staticData:      specTempl.StaticData,
-				name:            name,
-				renderOnce:      cmp.Or(specTempl.RenderOnce || specTempl.RefreshInterval == 0),
-				raw:             specTempl.Raw,
-				missingKey:      strings.TrimSpace(specTempl.MissingKey),
+				refreshInterval:  time.Duration(specTempl.RefreshInterval),
+				html:             specTempl.HTML,
+				templateDelims:   specTempl.TemplateDelimiters,
+				actions:          specTempl.Actions,
+				readFrom:         os.ExpandEnv(specTempl.Source),
+				dest:             os.ExpandEnv(specTempl.Destination),
+				staticData:       specTempl.StaticData,
+				name:             name,
+				renderOnce:       cmp.Or(specTempl.RenderOnce || specTempl.RefreshInterval == 0),
+				raw:              specTempl.Raw,
+				missingKey:       strings.TrimSpace(specTempl.MissingKey),
+				refreshOnTrigger: specTempl.RefreshOnTrigger,
 			},
 		}
 
@@ -219,31 +221,25 @@ func (p *Proc) startRenderLoop(ctx context.Context, cfg sinkExecConfig) error {
 
 	defer cfg.parsed.CloseActions()
 
+	var refreshTrigger chan struct{}
+	if cfg.refreshOnTrigger {
+		refreshTrigger = make(chan struct{}, 1)
+	}
+
 	consecutiveFailures := 0
 	for consecutiveFailures < p.maxConsecFailures {
 		select {
 		case <-ctx.Done():
 			p.Logger.Info("stopping render sink", slog.String("sink", cfg.name), slog.String("cause", ctx.Err().Error()))
 			return ctx.Err()
+		case <-refreshTrigger:
 		case <-tick:
 			err := p.TickFunc(ctx, &sink, execer, cfg.staticData)
-			execErr := &cmdexec.ExecErr{}
-			switch {
-
-			case errors.Is(err, render.ContentsIdentical):
+			resetFailures := p.handleTickExecErr(err, cfg)
+			if resetFailures {
 				consecutiveFailures = 0
-			case errors.As(err, &execErr):
-				p.Logger.Error("render succeeded, exec failed",
-					slog.String("error", string(execErr.Stderr)),
-					slog.Int("exit-code", execErr.Status),
-					slog.String("tmpl", cfg.name))
+			} else {
 				consecutiveFailures++
-			case err != nil:
-				p.Logger.Error("render failed", slog.String("cause", err.Error()))
-				consecutiveFailures++
-			default:
-				p.Logger.Info("refresh complete", slog.String("tmpl", cfg.name))
-				consecutiveFailures = 0
 			}
 		}
 	}
@@ -256,6 +252,30 @@ func (p *Proc) startRenderLoop(ctx context.Context, cfg sinkExecConfig) error {
 		return fatal.NewError(errTooManyFailures)
 	}
 	return nil
+}
+
+func (p *Proc) handleTickExecErr(err error, cfg sinkExecConfig) (reset bool) {
+	execErr := &cmdexec.ExecErr{}
+	switch {
+	case errors.Is(err, render.ContentsIdentical):
+		return true
+	case errors.As(err, &execErr):
+		p.Logger.Error("render succeeded, exec failed",
+			slog.String("error", string(execErr.Stderr)),
+			slog.Int("exit-code", execErr.Status),
+			slog.String("tmpl", cfg.name))
+		return false
+	case err != nil:
+		p.Logger.Error("render failed", slog.String("cause", err.Error()))
+		return false
+	default:
+		p.Logger.Info("refresh complete", slog.String("tmpl", cfg.name))
+		return true
+	}
+}
+
+func handleTickExecErr(err error) {
+
 }
 
 type renderExecErr struct {

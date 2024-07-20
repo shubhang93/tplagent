@@ -47,6 +47,7 @@ type TemplateSpec struct {
 	HTML               bool              `json:"html"`
 	StaticData         any               `json:"static_data,omitempty"`
 	RefreshInterval    duration.Duration `json:"refresh_interval,omitempty"`
+	RefreshOnTrigger   bool              `json:"refresh_on_trigger"`
 	RenderOnce         bool              `json:"render_once,omitempty"`
 	MissingKey         string            `json:"missing_key"`
 
