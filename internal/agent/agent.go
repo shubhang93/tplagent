@@ -228,21 +228,25 @@ func (p *Proc) startRenderLoop(ctx context.Context, cfg sinkExecConfig) error {
 
 	consecutiveFailures := 0
 	for consecutiveFailures < p.maxConsecFailures {
+		resetFailures := true
 		select {
 		case <-ctx.Done():
 			p.Logger.Info("stopping render sink", slog.String("sink", cfg.name), slog.String("cause", ctx.Err().Error()))
 			return ctx.Err()
 		case <-refreshTrigger:
+			err := p.TickFunc(ctx, &sink, execer, cfg.staticData)
+			resetFailures = p.handleTickExecErr(err, cfg)
 		case <-tick:
 			err := p.TickFunc(ctx, &sink, execer, cfg.staticData)
-			resetFailures := p.handleTickExecErr(err, cfg)
-			if resetFailures {
-				consecutiveFailures = 0
-			} else {
-				consecutiveFailures++
-			}
+			resetFailures = p.handleTickExecErr(err, cfg)
 		}
+		if resetFailures {
+			consecutiveFailures = 0
+			continue
+		}
+		consecutiveFailures++
 	}
+
 	if consecutiveFailures == p.maxConsecFailures {
 		p.Logger.Error(
 			"stopping refresh loop",
@@ -272,10 +276,6 @@ func (p *Proc) handleTickExecErr(err error, cfg sinkExecConfig) (reset bool) {
 		p.Logger.Info("refresh complete", slog.String("tmpl", cfg.name))
 		return true
 	}
-}
-
-func handleTickExecErr(err error) {
-
 }
 
 type renderExecErr struct {
