@@ -127,7 +127,9 @@ func Validate(c *TPLAgent) error {
 
 func hasValidTemplName(tmplName string) bool {
 	for _, c := range tmplName {
-		if !unicode.IsLetter(c) && c != '-' && c != '_' {
+		switch {
+		case unicode.IsLetter(c), unicode.IsDigit(c), c == '-', c == '_':
+		default:
 			return false
 		}
 	}
