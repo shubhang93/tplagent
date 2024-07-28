@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"time"
+	"unicode"
 )
 
 var allowedLogFmts = map[string]struct{}{
@@ -62,7 +63,7 @@ type TPLAgent struct {
 func ReadFromFile(path string) (TPLAgent, error) {
 	confFile, err := os.Open(os.ExpandEnv(path))
 	if err != nil {
-		return TPLAgent{}, fatal.NewError(fmt.Errorf("Read config:%w", err))
+		return TPLAgent{}, fatal.NewError(fmt.Errorf("read config:%w", err))
 	}
 	return Read(confFile)
 }
@@ -88,6 +89,10 @@ func Validate(c *TPLAgent) error {
 
 		if tmplName == "" {
 			return errors.New(`validate:found "" as the template key`)
+		}
+
+		if !hasValidTemplName(tmplName) {
+			return fmt.Errorf(`validate:invalid template name: %s only "_" and "-" are allowed with alphabets`, tmplName)
 		}
 
 		refrInterval := tmplConfig.RefreshInterval
@@ -118,6 +123,15 @@ func Validate(c *TPLAgent) error {
 
 	return errors.Join(valErrs...)
 
+}
+
+func hasValidTemplName(tmplName string) bool {
+	for _, c := range tmplName {
+		if !unicode.IsLetter(c) && c != '-' && c != '_' {
+			return false
+		}
+	}
+	return true
 }
 
 func validateActionConfigs(actions []Actions) error {

@@ -7,6 +7,7 @@ import (
 	"github.com/shubhang93/tplagent/internal/tplactions"
 	"log/slog"
 	"os"
+	"strings"
 	"text/template"
 )
 
@@ -18,7 +19,9 @@ func attachActions(t *actionable.Template, registry map[string]tplactions.MakeFu
 			return fmt.Errorf("invalid action name:%s", ta.Name)
 		}
 		action := actionMaker()
-		if err := action.SetConfig(ta.Config); err != nil {
+		if err := action.SetConfig(ta.Config, tplactions.SetConfigOpts{
+			EnvPrefix: makeEnvPrefix(ta.Name),
+		}); err != nil {
 			return fmt.Errorf("error setting config for %s", ta.Name)
 		}
 		action.SetLogger(l)
@@ -40,6 +43,10 @@ func attachActions(t *actionable.Template, registry map[string]tplactions.MakeFu
 	// ex: api_getJSON
 	t.Funcs(namesSpacedFuncMap)
 	return nil
+}
+
+func makeEnvPrefix(name string) string {
+	return strings.ReplaceAll(strings.ToUpper(name), "-", "_")
 }
 
 func setTemplateDelims(t *actionable.Template, delims []string) {

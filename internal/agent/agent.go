@@ -66,6 +66,7 @@ type Proc struct {
 	TickFunc          tickFunc
 	configs           []sinkExecConfig
 	Reloaded          bool
+	RefreshTriggers   map[string]chan struct{}
 	maxConsecFailures int
 }
 
@@ -215,16 +216,17 @@ func (p *Proc) startRenderLoop(ctx context.Context, cfg sinkExecConfig) error {
 		return nil
 	}
 
-	ticker := time.NewTicker(cfg.refreshInterval)
-	tick := ticker.C
-	defer ticker.Stop()
+	var ticker *time.Ticker
+	var tick <-chan time.Time
+	if !cfg.refreshOnTrigger {
+		ticker = time.NewTicker(cfg.refreshInterval)
+		tick = ticker.C
+		defer ticker.Stop()
+	}
 
 	defer cfg.parsed.CloseActions()
 
-	var refreshTrigger chan struct{}
-	if cfg.refreshOnTrigger {
-		refreshTrigger = make(chan struct{}, 1)
-	}
+	refreshTrigger := make(chan struct{})
 
 	consecutiveFailures := 0
 	for consecutiveFailures < p.maxConsecFailures {

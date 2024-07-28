@@ -97,7 +97,7 @@ func (a *Actions) FuncMap() template.FuncMap {
 	}
 }
 
-func (a *Actions) SetConfig(bs []byte) error {
+func (a *Actions) SetConfig(bs []byte, opts tplactions.SetConfigOpts) error {
 
 	var c Config
 	if err := json.Unmarshal(bs, &c); err != nil {

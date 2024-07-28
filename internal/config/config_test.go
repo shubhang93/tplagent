@@ -6,6 +6,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/shubhang93/tplagent/internal/duration"
 	"github.com/shubhang93/tplagent/internal/fatal"
+	"github.com/shubhang93/tplagent/internal/tplactions"
 	"log/slog"
 	"strings"
 	"testing"
@@ -18,19 +19,32 @@ type sampleConfig struct {
 	AuthToken string `json:"auth_token"`
 }
 type sampleActions struct {
-	sc *sampleConfig
+	sc        *sampleConfig
+	envPrefix string
 }
 
+var _ tplactions.Interface = &sampleActions{}
+
+func (s *sampleActions) SetLogger(*slog.Logger) {
+
+}
+
+func (s *sampleActions) Close() {
+
+}
 func (s *sampleActions) FuncMap() template.FuncMap {
 	return make(template.FuncMap)
 }
 
-func (s *sampleActions) SetConfig(bb []byte) error {
+func (s *sampleActions) SetConfig(bb []byte, opts tplactions.SetConfigOpts) error {
 	var sc sampleConfig
 	err := json.Unmarshal(bb, &sc)
 	if err != nil {
 		return err
 	}
+
+	s.envPrefix = opts.EnvPrefix
+
 	s.sc = &sc
 	return nil
 }
@@ -58,6 +72,7 @@ func Test_readConfig(t *testing.T) {
       "destination": "/etc/config/test.cfg",
       "actions": [
         {
+		  "env_prefix": "test_config",
           "name": "test_provider",
           "config": {
             "key": "val"
@@ -65,7 +80,7 @@ func Test_readConfig(t *testing.T) {
         }
       ]
     },
-    "test-config2": {
+    "test-config-two": {
       "refresh_interval": "5s",
       "exec": {
         "cmd": "echo",
@@ -105,7 +120,7 @@ func Test_readConfig(t *testing.T) {
 						},
 					},
 				},
-				"test-config2": {
+				"test-config-two": {
 					RefreshInterval: duration.Duration(5 * time.Second),
 					Exec: &ExecSpec{
 						Cmd:     "echo",
@@ -183,11 +198,12 @@ func Test_readConfig(t *testing.T) {
 		conf, err := Read(strings.NewReader(configJSON))
 		if err != nil {
 			t.Errorf("error reading config:%v\n", err)
+			return
 		}
 		templConf := conf.TemplateSpecs["test-config"]
 		prov := templConf.Actions[0]
 		sp := sampleActions{}
-		if err := sp.SetConfig(prov.Config); err != nil {
+		if err := sp.SetConfig(prov.Config, tplactions.SetConfigOpts{}); err != nil {
 			t.Errorf("error reading config for sample provider:%v\n", err)
 			return
 		}

@@ -5,9 +5,13 @@ import (
 	"text/template"
 )
 
+type SetConfigOpts struct {
+	EnvPrefix string
+}
+
 type Interface interface {
 	FuncMap() template.FuncMap
-	SetConfig([]byte) error
+	SetConfig([]byte, SetConfigOpts) error
 	SetLogger(logger *slog.Logger)
 	Close()
 }
