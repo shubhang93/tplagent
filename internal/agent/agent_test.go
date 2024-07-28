@@ -442,9 +442,6 @@ func Test_renderLoop(t *testing.T) {
 		}
 	})
 
-	t.Run("refresh on trigger test", func(t *testing.T) {
-		tmp := t.TempDir()
-	})
 }
 
 func newLogger() *slog.Logger {
