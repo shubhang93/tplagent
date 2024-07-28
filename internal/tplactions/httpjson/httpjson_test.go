@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/google/go-cmp/cmp"
+	"github.com/shubhang93/tplagent/internal/tplactions"
 	"net/http"
 	"testing"
 	"text/template"
@@ -19,7 +20,7 @@ func Test_Actions(t *testing.T) {
 
 		time.Sleep(500 * time.Millisecond)
 		a := &Actions{}
-		err := a.SetConfig([]byte(`{"base_url":"http://localhost:5001","timeout":"5s"}`))
+		err := a.SetConfig([]byte(`{"base_url":"http://localhost:5001","timeout":"5s"}`), tplactions.SetConfigOpts{})
 		if err != nil {
 			t.Error(err)
 			return
@@ -59,7 +60,7 @@ func Test_Actions(t *testing.T) {
 
 		time.Sleep(500 * time.Millisecond)
 		a := &Actions{}
-		err := a.SetConfig([]byte(`{"base_url":"http://localhost:5001","timeout":"5s"}`))
+		err := a.SetConfig([]byte(`{"base_url":"http://localhost:5001","timeout":"5s"}`), tplactions.SetConfigOpts{})
 		if err != nil {
 			t.Error(err)
 			return
