@@ -11,6 +11,8 @@ import (
 	"text/template"
 )
 
+const agentEnvPrefix = "TPLA"
+
 func attachActions(t *actionable.Template, registry map[string]tplactions.MakeFunc, l *slog.Logger, templActions []config.Actions) error {
 	namesSpacedFuncMap := make(template.FuncMap)
 	for _, ta := range templActions {
@@ -20,9 +22,9 @@ func attachActions(t *actionable.Template, registry map[string]tplactions.MakeFu
 		}
 		action := actionMaker()
 		if err := action.SetConfig(ta.Config, tplactions.SetConfigOpts{
-			EnvPrefix: makeEnvPrefix(ta.Name),
+			EnvPrefix: makeEnvPrefix(t.Name),
 		}); err != nil {
-			return fmt.Errorf("error setting config for %s", ta.Name)
+			return fmt.Errorf("error setting config for %s:%w", ta.Name, err)
 		}
 		action.SetLogger(l)
 		t.AddAction(action)
@@ -45,8 +47,9 @@ func attachActions(t *actionable.Template, registry map[string]tplactions.MakeFu
 	return nil
 }
 
-func makeEnvPrefix(name string) string {
-	return strings.ReplaceAll(strings.ToUpper(name), "-", "_")
+func makeEnvPrefix(tmplName string) string {
+	sanitizedName := strings.ToUpper(strings.ReplaceAll(tmplName, "-", "_"))
+	return fmt.Sprintf("%s_%s", agentEnvPrefix, sanitizedName)
 }
 
 func setTemplateDelims(t *actionable.Template, delims []string) {

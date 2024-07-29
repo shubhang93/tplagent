@@ -37,14 +37,15 @@ func (s *sampleActions) FuncMap() template.FuncMap {
 }
 
 func (s *sampleActions) SetConfig(bb []byte, opts tplactions.SetConfigOpts) error {
+	s.envPrefix = opts.EnvPrefix
 	var sc sampleConfig
+	if len(bb) < 1 {
+		return nil
+	}
 	err := json.Unmarshal(bb, &sc)
 	if err != nil {
 		return err
 	}
-
-	s.envPrefix = opts.EnvPrefix
-
 	s.sc = &sc
 	return nil
 }

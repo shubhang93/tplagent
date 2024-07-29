@@ -11,7 +11,7 @@ type SetConfigOpts struct {
 
 type Interface interface {
 	FuncMap() template.FuncMap
-	SetConfig([]byte, SetConfigOpts) error
+	SetConfig(configJSON []byte, opts SetConfigOpts) error
 	SetLogger(logger *slog.Logger)
 	Close()
 }

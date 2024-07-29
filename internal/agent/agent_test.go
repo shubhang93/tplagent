@@ -441,7 +441,6 @@ func Test_renderLoop(t *testing.T) {
 
 		}
 	})
-
 }
 
 func newLogger() *slog.Logger {

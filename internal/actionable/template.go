@@ -11,10 +11,13 @@ type Template struct {
 	html          *template.Template
 	text          *texttemp.Template
 	activeActions []tplactions.Interface
+	Name          string
 }
 
 func NewTemplate(name string, html bool) *Template {
-	t := &Template{}
+	t := &Template{
+		Name: name,
+	}
 	if html {
 		t.html = template.New(name)
 		return t

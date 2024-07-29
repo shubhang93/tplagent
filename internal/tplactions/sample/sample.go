@@ -13,23 +13,25 @@ type Config struct {
 }
 
 type Actions struct {
-	config *Config
+	Config *Config
+	Opts   tplactions.SetConfigOpts
 }
 
 func (sa *Actions) FuncMap() template.FuncMap {
 	return template.FuncMap{
 		"greet": func(s string) string {
-			return fmt.Sprintf("%s %s", sa.config.GreetMessage, s)
+			return fmt.Sprintf("%s %s", sa.Config.GreetMessage, s)
 		},
 	}
 }
 
 func (sa *Actions) SetConfig(bs []byte, opts tplactions.SetConfigOpts) error {
+	sa.Opts = opts
 	var c Config
 	if err := json.Unmarshal(bs, &c); err != nil {
 		return err
 	}
-	sa.config = &c
+	sa.Config = &c
 	return nil
 }
 
