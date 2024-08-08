@@ -66,7 +66,7 @@ type Proc struct {
 	TickFunc          tickFunc
 	configs           []sinkExecConfig
 	Reloaded          bool
-	RefreshTriggers   map[string]chan struct{}
+	refreshTriggers   map[string]chan struct{}
 	maxConsecFailures int
 }
 

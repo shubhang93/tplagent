@@ -142,10 +142,6 @@ func Test_Actions_Auth(t *testing.T) {
 		}
 	})
 
-	t.Run("config test", func(t *testing.T) {
-		a := newAction()
-		jsonConfig := `{""}`
-	})
 }
 
 func startMockServer() {
