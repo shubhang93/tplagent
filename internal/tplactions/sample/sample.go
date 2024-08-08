@@ -14,7 +14,6 @@ type Config struct {
 
 type Actions struct {
 	Config *Config
-	Opts   tplactions.SetConfigOpts
 }
 
 func (sa *Actions) FuncMap() template.FuncMap {
@@ -25,10 +24,9 @@ func (sa *Actions) FuncMap() template.FuncMap {
 	}
 }
 
-func (sa *Actions) SetConfig(bs []byte, opts tplactions.SetConfigOpts) error {
-	sa.Opts = opts
+func (sa *Actions) SetConfig(configJSON []byte, env tplactions.Env) error {
 	var c Config
-	if err := json.Unmarshal(bs, &c); err != nil {
+	if err := json.Unmarshal(configJSON, &c); err != nil {
 		return err
 	}
 	sa.Config = &c

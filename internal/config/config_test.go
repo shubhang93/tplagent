@@ -36,13 +36,12 @@ func (s *sampleActions) FuncMap() template.FuncMap {
 	return make(template.FuncMap)
 }
 
-func (s *sampleActions) SetConfig(bb []byte, opts tplactions.SetConfigOpts) error {
-	s.envPrefix = opts.EnvPrefix
+func (s *sampleActions) SetConfig(configJSON []byte, env tplactions.Env) error {
 	var sc sampleConfig
-	if len(bb) < 1 {
+	if len(configJSON) < 1 {
 		return nil
 	}
-	err := json.Unmarshal(bb, &sc)
+	err := json.Unmarshal(configJSON, &sc)
 	if err != nil {
 		return err
 	}
@@ -204,7 +203,7 @@ func Test_readConfig(t *testing.T) {
 		templConf := conf.TemplateSpecs["test-config"]
 		prov := templConf.Actions[0]
 		sp := sampleActions{}
-		if err := sp.SetConfig(prov.Config, tplactions.SetConfigOpts{}); err != nil {
+		if err := sp.SetConfig(prov.Config, tplactions.Env{}); err != nil {
 			t.Errorf("error reading config for sample provider:%v\n", err)
 			return
 		}

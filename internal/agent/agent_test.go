@@ -434,11 +434,13 @@ func Test_renderLoop(t *testing.T) {
 				},
 				execConfig: nil,
 			}},
-			maxConsecFailures: 0,
+			maxConsecFailures: defaultMaxConsecFailures,
 		}
-		if err := p.startTickLoops(context.Background()); err != nil {
-			t.Error(err)
 
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
+		if err := p.startTickLoops(ctx); err != nil && !errors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("test failed with error:%v", err)
 		}
 	})
 }

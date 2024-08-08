@@ -207,25 +207,20 @@ func (p *Proc) startRenderLoop(ctx context.Context, cfg sinkExecConfig) error {
 		}
 	}
 
+	var ticker *time.Ticker
+	var tick <-chan time.Time
 	if cfg.renderOnce {
 		if err := p.TickFunc(ctx, &sink, execer, cfg.staticData); err != nil && !errors.Is(err, render.ContentsIdentical) {
 			p.Logger.Error("RenderAndExec error", slog.String("error", err.Error()), slog.String("loop", cfg.name), slog.Bool("once", true))
-			return err
 		}
 		p.Logger.Info("refresh complete", slog.Bool("once", true), slog.String("templ", cfg.name))
-		return nil
-	}
-
-	var ticker *time.Ticker
-	var tick <-chan time.Time
-	if !cfg.refreshOnTrigger {
+	} else {
 		ticker = time.NewTicker(cfg.refreshInterval)
-		tick = ticker.C
 		defer ticker.Stop()
+		tick = ticker.C
 	}
 
 	defer cfg.parsed.CloseActions()
-
 	refreshTrigger := make(chan struct{})
 
 	consecutiveFailures := 0
@@ -250,6 +245,7 @@ func (p *Proc) startRenderLoop(ctx context.Context, cfg sinkExecConfig) error {
 	}
 
 	if consecutiveFailures == p.maxConsecFailures {
+		fmt.Println("failures:", consecutiveFailures, p.maxConsecFailures)
 		p.Logger.Error(
 			"stopping refresh loop",
 			slog.String("templ", cfg.name),

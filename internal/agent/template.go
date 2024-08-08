@@ -21,9 +21,8 @@ func attachActions(t *actionable.Template, registry map[string]tplactions.MakeFu
 			return fmt.Errorf("invalid action name:%s", ta.Name)
 		}
 		action := actionMaker()
-		if err := action.SetConfig(ta.Config, tplactions.SetConfigOpts{
-			EnvPrefix: makeEnvPrefix(t.Name),
-		}); err != nil {
+		env := tplactions.Env{Prefix: makeEnvPrefix(t.Name)}
+		if err := action.SetConfig(ta.Config, env); err != nil {
 			return fmt.Errorf("error setting config for %s:%w", ta.Name, err)
 		}
 		action.SetLogger(l)

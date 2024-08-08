@@ -18,7 +18,6 @@ type testActionConfig struct {
 	GreetMessage string `json:"greet_message"`
 }
 type testAction struct {
-	Opts   tplactions.SetConfigOpts
 	Config testActionConfig
 }
 
@@ -30,8 +29,7 @@ func (t *testAction) FuncMap() template.FuncMap {
 	}
 }
 
-func (t *testAction) SetConfig(configJSON []byte, opts tplactions.SetConfigOpts) error {
-	t.Opts = opts
+func (t *testAction) SetConfig(configJSON []byte, env tplactions.Env) error {
 
 	if len(configJSON) < 1 {
 		return nil
@@ -39,6 +37,11 @@ func (t *testAction) SetConfig(configJSON []byte, opts tplactions.SetConfigOpts)
 
 	if err := json.Unmarshal(configJSON, &t.Config); err != nil {
 		return err
+	}
+
+	msg := env.Get("GREET_MESSAGE")
+	if msg != "" {
+		t.Config.GreetMessage = msg
 	}
 
 	return nil
@@ -180,31 +183,30 @@ hello Foo`
 		}
 	})
 
-	t.Run("SetConfigOpts test", func(t *testing.T) {
+	t.Run("read env test", func(t *testing.T) {
 		ta := testAction{}
+		t.Setenv("TPLA_SAMPLE_GREET_MESSAGE", "helloFoo")
 		registry := map[string]tplactions.MakeFunc{
 			"sample": func() tplactions.Interface {
 				return &ta
 			},
 		}
 		templ := actionable.NewTemplate("sample", false)
-		err := attachActions(templ, registry, newLogger(), []config.Actions{{
-			Name:   "sample",
-			Config: nil,
-		}})
+		err := attachActions(templ, registry, newLogger(), []config.Actions{
+			{
+				Name:   "sample",
+				Config: json.RawMessage(`{"greet_message":"heyBar"}`),
+			}})
 
 		if err != nil {
-			t.Errorf("error attaching actions:%v\n", err)
+			t.Error(err)
 			return
 		}
 
-		expectedOpts := tplactions.SetConfigOpts{
-			EnvPrefix: "TPLA_SAMPLE",
-		}
-
-		if diff := cmp.Diff(expectedOpts, ta.Opts); diff != "" {
+		expectedConfig := testActionConfig{GreetMessage: "helloFoo"}
+		gotConfig := ta.Config
+		if diff := cmp.Diff(expectedConfig, gotConfig); diff != "" {
 			t.Error(diff)
 		}
-
 	})
 }

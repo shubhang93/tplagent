@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -38,6 +39,74 @@ type httpDoer interface {
 type Actions struct {
 	Client httpDoer
 	Conf   Config
+}
+
+func overrideConfigFromEnv(env tplactions.Env, c *Config) error {
+	baseURL := env.Get("HTTPJSON_BASE_URL")
+	authUser := env.Get("HTTPJSON_AUTH_USER")
+	authPass := env.Get("HTTPJSON_AUTH_PASS")
+	headers := env.Get("HTTPJSON_HEADERS")
+	errorStatuses := env.Get("HTTPJSON_ERROR_STATUSES")
+	timeout := env.Get("HTTPJSON_TIMEOUT")
+	authToken := env.Get("HTTPJSON_AUTH_TOKEN")
+
+	if baseURL != "" {
+		c.BaseURL = baseURL
+	}
+	if authUser != "" && c.Auth.BasicAuth != nil {
+		c.Auth.BasicAuth["username"] = authUser
+	}
+
+	if authPass != "" && c.Auth.BasicAuth != nil {
+		c.Auth.BasicAuth["password"] = authPass
+	}
+
+	if authToken != "" {
+		bt := BearerToken(authToken)
+		c.Auth.BearerToken = &bt
+	}
+
+	if len(errorStatuses) > 0 {
+		statuses, err := parseErrorStatuses(errorStatuses)
+		if err != nil {
+			return fmt.Errorf("error reading key:%s:%w", "HTTPJSON_ERROR_STATUSES", err)
+		}
+		c.ErrorStatuses = statuses
+	}
+
+	if len(timeout) > 0 {
+		td, err := time.ParseDuration(timeout)
+		if err != nil {
+			return fmt.Errorf("error reading key:%s:%w", "HTTPJSON_TIMEOUT", err)
+		}
+
+		c.Timeout = duration.Duration(td)
+	}
+
+	if headers != "" {
+		parts := strings.Split(headers, ";")
+		for _, part := range parts {
+			kvs := strings.Split(part, ":")
+			k := strings.Trim(kvs[0], " ")
+			v := strings.Trim(kvs[1], " ")
+			c.Headers[k] = v
+		}
+	}
+
+	return nil
+}
+
+func parseErrorStatuses(statuses string) ([]int, error) {
+	parts := strings.Split(statuses, ";")
+	temp := make([]int, len(statuses))
+	for i, part := range parts {
+		parsed, err := strconv.Atoi(part)
+		if err != nil {
+			return nil, err
+		}
+		temp[i] = parsed
+	}
+	return temp, nil
 }
 
 func (a *Actions) SetLogger(_ *slog.Logger) {}
@@ -97,10 +166,10 @@ func (a *Actions) FuncMap() template.FuncMap {
 	}
 }
 
-func (a *Actions) SetConfig(bs []byte, opts tplactions.SetConfigOpts) error {
+func (a *Actions) SetConfig(configJSON []byte, env tplactions.Env) error {
 
 	var c Config
-	if err := json.Unmarshal(bs, &c); err != nil {
+	if err := json.Unmarshal(configJSON, &c); err != nil {
 		return fmt.Errorf("error unmarshalling config:%w", err)
 	}
 
@@ -109,6 +178,11 @@ func (a *Actions) SetConfig(bs []byte, opts tplactions.SetConfigOpts) error {
 	a.Client = &http.Client{
 		Timeout: time.Duration(a.Conf.Timeout),
 	}
+
+	if err := overrideConfigFromEnv(env, &a.Conf); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -147,8 +221,15 @@ func setHeaders(r *http.Request, hs map[string]string) {
 	}
 }
 
+func newAction() tplactions.Interface {
+	return &Actions{
+		Conf: Config{
+			Auth:    &Auth{BasicAuth: map[string]string{}},
+			Headers: map[string]string{},
+		},
+	}
+}
+
 func init() {
-	tplactions.Register("httpjson", func() tplactions.Interface {
-		return &Actions{}
-	})
+	tplactions.Register("httpjson", newAction)
 }

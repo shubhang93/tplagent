@@ -20,7 +20,7 @@ func Test_Actions(t *testing.T) {
 
 		time.Sleep(500 * time.Millisecond)
 		a := &Actions{}
-		err := a.SetConfig([]byte(`{"base_url":"http://localhost:5001","timeout":"5s"}`), tplactions.SetConfigOpts{})
+		err := a.SetConfig([]byte(`{"base_url":"http://localhost:5001","timeout":"5s"}`), tplactions.Env{})
 		if err != nil {
 			t.Error(err)
 			return
@@ -60,7 +60,7 @@ func Test_Actions(t *testing.T) {
 
 		time.Sleep(500 * time.Millisecond)
 		a := &Actions{}
-		err := a.SetConfig([]byte(`{"base_url":"http://localhost:5001","timeout":"5s"}`), tplactions.SetConfigOpts{})
+		err := a.SetConfig([]byte(`{"base_url":"http://localhost:5001","timeout":"5s"}`), tplactions.Env{})
 		if err != nil {
 			t.Error(err)
 			return
@@ -140,6 +140,11 @@ func Test_Actions_Auth(t *testing.T) {
 		if authHeader != "Bearer foo" {
 			t.Error("invalid authorization header")
 		}
+	})
+
+	t.Run("config test", func(t *testing.T) {
+		a := newAction()
+		jsonConfig := `{""}`
 	})
 }
 
