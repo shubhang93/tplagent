@@ -15,6 +15,7 @@ import (
 	"os"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -443,6 +444,69 @@ func Test_renderLoop(t *testing.T) {
 			t.Errorf("test failed with error:%v", err)
 		}
 	})
+
+	t.Run("render once with refresh trigger", func(t *testing.T) {
+
+		tickCount := atomic.Int32{}
+
+		tmp := t.TempDir()
+		p := Proc{
+			Logger: newLogger(),
+			TickFunc: func(ctx context.Context, sink Renderer, execer CMDExecer, staticData any) error {
+				tickCount.Add(1)
+				return nil
+			},
+			configs: []sinkExecConfig{{
+				sinkConfig: sinkConfig{
+					name:       "test-render",
+					dest:       tmp + "/test.render",
+					raw:        "hello foo",
+					renderOnce: true,
+				},
+				execConfig: nil,
+			}, {
+				sinkConfig: sinkConfig{
+					name:       "test2-render",
+					dest:       tmp + "/test2.render",
+					raw:        "hello bar",
+					renderOnce: true,
+				},
+				execConfig: nil,
+			}},
+			refreshTriggers:   make(map[string]triggerFlow),
+			maxConsecFailures: defaultMaxConsecFailures,
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			if err := p.startTickLoops(ctx); err != nil && !errors.Is(err, context.DeadlineExceeded) {
+				t.Errorf("test failed with error:%v", err)
+			}
+		}()
+
+		wantTickCount := int32(4)
+
+		time.Sleep(500 * time.Millisecond)
+		if err := p.TriggerRefresh("test-render"); err != nil {
+			t.Errorf("refresh trigger failed for %s:%v", "test-render", err)
+		}
+
+		if err := p.TriggerRefresh("test2-render"); err != nil {
+			t.Errorf("refresh trigger failed for %s:%v", "test-render", err)
+		}
+
+		<-done
+		gotTickCount := tickCount.Load()
+		if wantTickCount != gotTickCount {
+			t.Errorf("want count:%d got count:%d", wantTickCount, gotTickCount)
+		}
+		cancel()
+
+	})
+
 }
 
 func newLogger() *slog.Logger {

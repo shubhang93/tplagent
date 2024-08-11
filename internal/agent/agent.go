@@ -61,12 +61,19 @@ type execConfig struct {
 	env     map[string]string
 }
 
+type triggerFlow struct {
+	trigger     chan struct{}
+	triggerResp chan error
+}
 type Proc struct {
-	Logger            *slog.Logger
-	TickFunc          tickFunc
-	configs           []sinkExecConfig
-	Reloaded          bool
-	refreshTriggers   map[string]chan struct{}
+	Logger   *slog.Logger
+	TickFunc tickFunc
+	configs  []sinkExecConfig
+	Reloaded bool
+
+	triggerMU       sync.Mutex
+	refreshTriggers map[string]triggerFlow
+
 	maxConsecFailures int
 }
 
@@ -78,11 +85,30 @@ func (p *Proc) Start(ctx context.Context, config config.TPLAgent) error {
 		p.Logger.Info("agent starting")
 	}
 
+	if p.refreshTriggers == nil {
+		p.refreshTriggers = make(map[string]triggerFlow, len(config.TemplateSpecs))
+	}
+
 	templConfig := config.TemplateSpecs
 	scs := sanitizeConfigs(templConfig)
 	p.configs = scs
 	p.maxConsecFailures = cmp.Or(config.Agent.MaxConsecutiveFailures, defaultMaxConsecFailures)
 	return p.startTickLoops(ctx)
+}
+
+func (p *Proc) TriggerRefresh(templateName string) error {
+
+	p.triggerMU.Lock()
+	flow, ok := p.refreshTriggers[templateName]
+	p.triggerMU.Unlock()
+
+	if !ok {
+		return fmt.Errorf("render loop not initialized for template %s", templateName)
+	}
+
+	flow.trigger <- struct{}{}
+	return <-flow.triggerResp
+
 }
 
 func sanitizeConfigs(templConfig map[string]*config.TemplateSpec) []sinkExecConfig {
@@ -220,8 +246,22 @@ func (p *Proc) startRenderLoop(ctx context.Context, cfg sinkExecConfig) error {
 		tick = ticker.C
 	}
 
-	defer cfg.parsed.CloseActions()
 	refreshTrigger := make(chan struct{})
+	triggerResp := make(chan error)
+
+	p.triggerMU.Lock()
+	p.refreshTriggers[cfg.name] = triggerFlow{
+		trigger:     refreshTrigger,
+		triggerResp: triggerResp,
+	}
+	p.triggerMU.Unlock()
+
+	defer func() {
+		cfg.parsed.CloseActions()
+		p.triggerMU.Lock()
+		delete(p.refreshTriggers, cfg.name)
+		p.triggerMU.Unlock()
+	}()
 
 	consecutiveFailures := 0
 	for consecutiveFailures < p.maxConsecFailures {
@@ -232,6 +272,7 @@ func (p *Proc) startRenderLoop(ctx context.Context, cfg sinkExecConfig) error {
 			return ctx.Err()
 		case <-refreshTrigger:
 			err := p.TickFunc(ctx, &sink, execer, cfg.staticData)
+			triggerResp <- err
 			resetFailures = p.handleTickExecErr(err, cfg)
 		case <-tick:
 			err := p.TickFunc(ctx, &sink, execer, cfg.staticData)
