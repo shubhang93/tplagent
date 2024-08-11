@@ -445,68 +445,105 @@ func Test_renderLoop(t *testing.T) {
 		}
 	})
 
-	t.Run("render once with refresh trigger", func(t *testing.T) {
-
-		tickCount := atomic.Int32{}
-
-		tmp := t.TempDir()
-		p := Proc{
-			Logger: newLogger(),
-			TickFunc: func(ctx context.Context, sink Renderer, execer CMDExecer, staticData any) error {
-				tickCount.Add(1)
-				return nil
+	t.Run("refresh triggers", func(t *testing.T) {
+		tests := map[string]struct {
+			Configs   func(tmp string) []sinkExecConfig
+			WantCount int32
+		}{
+			"render once is true": {
+				Configs: func(tmp string) []sinkExecConfig {
+					return []sinkExecConfig{
+						{
+							sinkConfig: sinkConfig{
+								name:       "test-render",
+								dest:       tmp + "/test.render",
+								raw:        "hello foo",
+								renderOnce: true,
+							},
+							execConfig: nil,
+						}, {
+							sinkConfig: sinkConfig{
+								name:       "test2-render",
+								dest:       tmp + "/test2.render",
+								raw:        "hello bar",
+								renderOnce: true,
+							},
+							execConfig: nil,
+						}}
+				},
+				WantCount: 4,
 			},
-			configs: []sinkExecConfig{{
-				sinkConfig: sinkConfig{
-					name:       "test-render",
-					dest:       tmp + "/test.render",
-					raw:        "hello foo",
-					renderOnce: true,
+			"refresh interval is set": {
+				Configs: func(tmp string) []sinkExecConfig {
+					return []sinkExecConfig{{
+						sinkConfig: sinkConfig{
+							name:            "test-render",
+							dest:            tmp + "/test.render",
+							raw:             "hello foo",
+							refreshInterval: 2500 * time.Millisecond,
+						},
+						execConfig: nil,
+					}, {
+						sinkConfig: sinkConfig{
+							name:            "test2-render",
+							dest:            tmp + "/test2.render",
+							raw:             "hello bar",
+							refreshInterval: 2500 * time.Millisecond,
+						},
+						execConfig: nil,
+					}}
 				},
-				execConfig: nil,
-			}, {
-				sinkConfig: sinkConfig{
-					name:       "test2-render",
-					dest:       tmp + "/test2.render",
-					raw:        "hello bar",
-					renderOnce: true,
-				},
-				execConfig: nil,
-			}},
-			refreshTriggers:   make(map[string]triggerFlow),
-			maxConsecFailures: defaultMaxConsecFailures,
+				WantCount: 4,
+			},
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		for name, tc := range tests {
+			t.Run(name, func(t *testing.T) {
+				tickCount := atomic.Int32{}
 
-		done := make(chan struct{})
-		go func() {
-			defer close(done)
-			if err := p.startTickLoops(ctx); err != nil && !errors.Is(err, context.DeadlineExceeded) {
-				t.Errorf("test failed with error:%v", err)
-			}
-		}()
+				tmp := t.TempDir()
 
-		wantTickCount := int32(4)
+				p := Proc{
+					Logger: newLogger(),
+					TickFunc: func(ctx context.Context, sink Renderer, execer CMDExecer, staticData any) error {
+						tickCount.Add(1)
+						return nil
+					},
+					configs:           tc.Configs(tmp),
+					refreshTriggers:   make(map[string]triggerFlow),
+					maxConsecFailures: defaultMaxConsecFailures,
+				}
 
-		time.Sleep(500 * time.Millisecond)
-		if err := p.TriggerRefresh("test-render"); err != nil {
-			t.Errorf("refresh trigger failed for %s:%v", "test-render", err)
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				done := make(chan struct{})
+				go func() {
+					defer close(done)
+					if err := p.startTickLoops(ctx); err != nil && !errors.Is(err, context.DeadlineExceeded) {
+						t.Errorf("test failed with error:%v", err)
+					}
+				}()
+
+				wantTickCount := tc.WantCount
+				time.Sleep(500 * time.Millisecond)
+				if err := p.TriggerRefresh("test-render"); err != nil {
+					t.Errorf("refresh trigger failed for %s:%v", "test-render", err)
+				}
+
+				if err := p.TriggerRefresh("test2-render"); err != nil {
+					t.Errorf("refresh trigger failed for %s:%v", "test-render", err)
+				}
+
+				<-done
+				gotTickCount := tickCount.Load()
+				if wantTickCount != gotTickCount {
+					t.Errorf("want count:%d got count:%d", wantTickCount, gotTickCount)
+				}
+				cancel()
+			})
 		}
-
-		if err := p.TriggerRefresh("test2-render"); err != nil {
-			t.Errorf("refresh trigger failed for %s:%v", "test-render", err)
-		}
-
-		<-done
-		gotTickCount := tickCount.Load()
-		if wantTickCount != gotTickCount {
-			t.Errorf("want count:%d got count:%d", wantTickCount, gotTickCount)
-		}
-		cancel()
 
 	})
-
+	
 }
 
 func newLogger() *slog.Logger {
