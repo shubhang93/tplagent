@@ -179,6 +179,7 @@ func Test_renderLoop(t *testing.T) {
 				Logger:            newLogger(),
 				maxConsecFailures: 10,
 				TickFunc:          onTick,
+				refreshTriggers:   make(map[string]triggerFlow),
 			}
 			err := p.startRenderLoop(ctx, ltest.cfg)
 			if err != nil && !errors.Is(err, context.DeadlineExceeded) {
@@ -227,6 +228,7 @@ func Test_renderLoop(t *testing.T) {
 			},
 			Logger:            newLogger(),
 			maxConsecFailures: 4,
+			refreshTriggers:   make(map[string]triggerFlow),
 		}
 		cfg := sinkExecConfig{
 			sinkConfig: sinkConfig{
@@ -377,6 +379,7 @@ func Test_renderLoop(t *testing.T) {
 			configs:           configs,
 			maxConsecFailures: 10,
 			TickFunc:          tf,
+			refreshTriggers:   make(map[string]triggerFlow),
 		}
 
 		if err := p.startTickLoops(ctx); fatal.Is(err) {
@@ -417,8 +420,9 @@ func Test_renderLoop(t *testing.T) {
 	t.Run("all configs render once", func(t *testing.T) {
 		tmp := t.TempDir()
 		p := Proc{
-			Logger:   newLogger(),
-			TickFunc: RenderAndExec,
+			Logger:          newLogger(),
+			TickFunc:        RenderAndExec,
+			refreshTriggers: make(map[string]triggerFlow),
 			configs: []sinkExecConfig{{
 				sinkConfig: sinkConfig{
 					name:       "test-render",
