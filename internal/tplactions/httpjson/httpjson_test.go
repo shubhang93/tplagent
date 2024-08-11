@@ -5,21 +5,50 @@ import (
 	"fmt"
 	"github.com/google/go-cmp/cmp"
 	"github.com/shubhang93/tplagent/internal/tplactions"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"text/template"
-	"time"
 )
+
+type mockTransport struct{}
+
+func (m mockTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	makeBody := func(content string) io.ReadCloser {
+		return io.NopCloser(strings.NewReader(content))
+	}
+	path := request.URL.Path
+	switch path {
+	case "/any_value":
+		return &http.Response{
+			StatusCode: 200,
+			Body:       makeBody(`Foo`),
+		}, nil
+
+	case "/json_slice":
+		return &http.Response{
+			StatusCode: 200,
+			Body:       makeBody(`["abcd","efgh","hijk","oj"]`),
+		}, nil
+	case "/json_map":
+		return &http.Response{
+			StatusCode: 200,
+			Body:       makeBody(`{"id":"1234","name":"ABCD"}`),
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown path:%s", path)
+	}
+}
 
 func Test_Actions(t *testing.T) {
 	t.Run("GET_Map", func(t *testing.T) {
 
-		go func() {
-			startMockServer()
-		}()
-
-		time.Sleep(500 * time.Millisecond)
-		a := &Actions{}
+		a := &Actions{
+			Client: &http.Client{
+				Transport: mockTransport{},
+			},
+		}
 		err := a.SetConfig([]byte(`{"base_url":"http://localhost:5001","timeout":"5s"}`), tplactions.Env{})
 		if err != nil {
 			t.Error(err)
@@ -54,12 +83,9 @@ func Test_Actions(t *testing.T) {
 
 	t.Run("GET_Slice", func(t *testing.T) {
 
-		go func() {
-			startMockServer()
-		}()
-
-		time.Sleep(500 * time.Millisecond)
-		a := &Actions{}
+		a := &Actions{
+			Client: &http.Client{Transport: mockTransport{}},
+		}
 		err := a.SetConfig([]byte(`{"base_url":"http://localhost:5001","timeout":"5s"}`), tplactions.Env{})
 		if err != nil {
 			t.Error(err)
@@ -101,7 +127,9 @@ func Test_Actions_Auth(t *testing.T) {
 	t.Run("basic auth", func(t *testing.T) {
 		a := Actions{Conf: Config{Auth: &Auth{
 			BasicAuth: map[string]string{"username": "foo", "password": "bar"},
-		}}}
+		}},
+			Client: &http.Client{Transport: mockTransport{}},
+		}
 		req, err := a.newRequest("/foo", http.MethodGet, nil)
 		if err != nil {
 			t.Error(err)
@@ -122,10 +150,14 @@ func Test_Actions_Auth(t *testing.T) {
 	})
 	t.Run("bearer auth", func(t *testing.T) {
 		token := "Bearer foo"
-		a := Actions{Conf: Config{Auth: &Auth{
-			BasicAuth:   map[string]string{},
-			BearerToken: (*BearerToken)(&token),
-		}}}
+		a := Actions{
+			Client: &http.Client{
+				Transport: mockTransport{},
+			},
+			Conf: Config{Auth: &Auth{
+				BasicAuth:   map[string]string{},
+				BearerToken: (*BearerToken)(&token),
+			}}}
 		req, err := a.newRequest("/foo", http.MethodGet, nil)
 		if err != nil {
 			t.Error(err)
@@ -142,21 +174,4 @@ func Test_Actions_Auth(t *testing.T) {
 		}
 	})
 
-}
-
-func startMockServer() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /json_map", func(writer http.ResponseWriter, request *http.Request) {
-		_, _ = fmt.Fprint(writer, `{"id":"1234","name":"ABCD"}`)
-	})
-
-	mux.HandleFunc("GET /json_slice", func(writer http.ResponseWriter, request *http.Request) {
-		_, _ = fmt.Fprint(writer, `["abcd","efgh","hijk","oj"]`)
-	})
-
-	mux.HandleFunc("GET /any_value", func(writer http.ResponseWriter, request *http.Request) {
-		_, _ = fmt.Fprint(writer, "Foo")
-	})
-
-	_ = http.ListenAndServe("localhost:5001", mux)
 }

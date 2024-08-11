@@ -32,12 +32,8 @@ type Config struct {
 	ErrorStatuses []int             `json:"error_statuses"`
 }
 
-type httpDoer interface {
-	Do(req *http.Request) (*http.Response, error)
-}
-
 type Actions struct {
-	Client httpDoer
+	Client *http.Client
 	Conf   Config
 }
 
@@ -175,8 +171,10 @@ func (a *Actions) SetConfig(configJSON []byte, env tplactions.Env) error {
 
 	a.Conf = c
 
-	a.Client = &http.Client{
-		Timeout: time.Duration(a.Conf.Timeout),
+	if a.Client == nil {
+		a.Client = &http.Client{
+			Timeout: time.Duration(a.Conf.Timeout),
+		}
 	}
 
 	if err := overrideConfigFromEnv(env, &a.Conf); err != nil {
