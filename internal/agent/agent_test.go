@@ -198,6 +198,7 @@ func Test_renderLoop(t *testing.T) {
 				return errors.New("error occurred")
 			},
 			maxConsecFailures: 5,
+			refreshTriggers:   make(map[string]triggerFlow),
 		}
 		cfg := sinkExecConfig{
 			sinkConfig: sinkConfig{
@@ -543,7 +544,7 @@ func Test_renderLoop(t *testing.T) {
 		}
 
 	})
-	
+
 }
 
 func newLogger() *slog.Logger {
