@@ -65,10 +65,10 @@ func ReadFromFile(path string) (TPLAgent, error) {
 	if err != nil {
 		return TPLAgent{}, fatal.NewError(fmt.Errorf("read config:%w", err))
 	}
-	return Read(confFile)
+	return Read(confFile, "json")
 }
 
-func Read(rr io.Reader) (TPLAgent, error) {
+func Read(rr io.Reader, configFormat string) (TPLAgent, error) {
 	var c TPLAgent
 	if err := json.NewDecoder(rr).Decode(&c); err != nil {
 		return TPLAgent{}, fatal.NewError(fmt.Errorf("config decode error:%w", err))

@@ -132,7 +132,7 @@ func Test_readConfig(t *testing.T) {
 				},
 			},
 		}
-		c, err := Read(strings.NewReader(configJSON))
+		c, err := Read(strings.NewReader(configJSON), "json")
 		if err != nil {
 			t.Errorf("error reading config:%v", err)
 			return
@@ -195,7 +195,7 @@ func Test_readConfig(t *testing.T) {
   }
 }
 `
-		conf, err := Read(strings.NewReader(configJSON))
+		conf, err := Read(strings.NewReader(configJSON), "json")
 		if err != nil {
 			t.Errorf("error reading config:%v\n", err)
 			return
@@ -240,7 +240,7 @@ func Test_config_fatalErrors(t *testing.T) {
 		buff.Reset()
 		buff.Write(jsonCfg)
 
-		_, err = Read(&buff)
+		_, err = Read(&buff, "json")
 		if !fatal.Is(err) {
 			t.Error("expected fatal error")
 			return
@@ -273,7 +273,7 @@ func Test_config_fatalErrors(t *testing.T) {
 			return
 		}
 
-		_, err = Read(&buff)
+		_, err = Read(&buff, "json")
 		if !fatal.Is(err) {
 			t.Error("expected fatal error")
 		}
