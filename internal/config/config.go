@@ -21,45 +21,45 @@ var allowedLogFmts = map[string]struct{}{
 }
 
 type Agent struct {
-	LogLevel               slog.Level `json:"log_level"`
-	LogFmt                 string     `json:"log_fmt"`
-	MaxConsecutiveFailures int        `json:"max_consecutive_failures"`
-	HTTPListenerAddr       string     `json:"http_listener_addr"`
+	LogLevel               slog.Level `json:"log_level" yaml:"log_level"`
+	LogFmt                 string     `json:"log_fmt" yaml:"log_fmt"`
+	MaxConsecutiveFailures int        `json:"max_consecutive_failures" yaml:"max_consecutive_failures"`
+	HTTPListenerAddr       string     `json:"http_listener_addr" yaml:"http_listener_addr"`
 }
 
 type Actions struct {
-	Name   string          `json:"name"`
-	Config json.RawMessage `json:"config"`
+	Name   string          `json:"name" yaml:"name"`
+	Config json.RawMessage `json:"config" yaml:"config"`
 }
 
 type ExecSpec struct {
-	Cmd        string            `json:"cmd"`
-	CmdArgs    []string          `json:"cmd_args"`
-	CmdTimeout duration.Duration `json:"cmd_timeout"`
-	Env        map[string]string `json:"env"`
+	Cmd        string            `json:"cmd" yaml:"cmd"`
+	CmdArgs    []string          `json:"cmd_args" yaml:"cmd_args"`
+	CmdTimeout duration.Duration `json:"cmd_timeout" yaml:"cmd_timeout"`
+	Env        map[string]string `json:"env" yaml:"env"`
 }
 
 type TemplateSpec struct {
 	// required for
 	// creation of template
-	Actions            []Actions         `json:"actions,omitempty"`
-	TemplateDelimiters []string          `json:"template_delimiters,omitempty"`
-	Source             string            `json:"source,omitempty"`
-	Raw                string            `json:"raw,omitempty"`
-	Destination        string            `json:"destination,omitempty"`
-	HTML               bool              `json:"html"`
-	StaticData         any               `json:"static_data,omitempty"`
-	RefreshInterval    duration.Duration `json:"refresh_interval,omitempty"`
-	RefreshOnTrigger   bool              `json:"refresh_on_trigger"`
-	RenderOnce         bool              `json:"render_once,omitempty"`
-	MissingKey         string            `json:"missing_key"`
+	Actions            []Actions         `json:"actions,omitempty" yaml:"actions,omitempty"`
+	TemplateDelimiters []string          `json:"template_delimiters,omitempty" yaml:"template_delimiters,omitempty"`
+	Source             string            `json:"source,omitempty" yaml:"source,omitempty"`
+	Raw                string            `json:"raw,omitempty" yaml:"raw,omitempty"`
+	Destination        string            `json:"destination,omitempty" yaml:"destination,omitempty"`
+	HTML               bool              `json:"html" yaml:"html"`
+	StaticData         any               `json:"static_data,omitempty" yaml:"static_data,omitempty"`
+	RefreshInterval    duration.Duration `json:"refresh_interval,omitempty" yaml:"refresh_interval,omitempty"`
+	RefreshOnTrigger   bool              `json:"refresh_on_trigger" yaml:"refresh_on_trigger"`
+	RenderOnce         bool              `json:"render_once,omitempty" yaml:"render_once,omitempty"`
+	MissingKey         string            `json:"missing_key" yaml:"missing_key"`
 
-	Exec *ExecSpec `json:"exec"`
+	Exec *ExecSpec `json:"exec" yaml:"exec"`
 }
 
 type TPLAgent struct {
-	Agent         Agent                    `json:"agent"`
-	TemplateSpecs map[string]*TemplateSpec `json:"templates"`
+	Agent         Agent                    `json:"agent" yaml:"agent"`
+	TemplateSpecs map[string]*TemplateSpec `json:"templates" yaml:"template_specs"`
 }
 
 func ReadFromFile(path string) (TPLAgent, error) {
