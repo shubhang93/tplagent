@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"github.com/shubhang93/tplagent/internal/duration"
 	"github.com/shubhang93/tplagent/internal/fatal"
+	"gopkg.in/yaml.v3"
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"time"
 	"unicode"
 )
@@ -61,16 +63,39 @@ type TPLAgent struct {
 }
 
 func ReadFromFile(path string) (TPLAgent, error) {
-	confFile, err := os.Open(os.ExpandEnv(path))
+
+	expandedPath := os.ExpandEnv(path)
+	confFile, err := os.Open(expandedPath)
 	if err != nil {
 		return TPLAgent{}, fatal.NewError(fmt.Errorf("read config:%w", err))
 	}
-	return Read(confFile, "json")
+
+	ext := filepath.Ext(expandedPath)
+	if len(ext) > 0 {
+		ext = ext[1:]
+	}
+
+	return Read(confFile, ext)
+}
+
+type decoder interface {
+	Decode(v any) error
 }
 
 func Read(rr io.Reader, configFormat string) (TPLAgent, error) {
 	var c TPLAgent
-	if err := json.NewDecoder(rr).Decode(&c); err != nil {
+
+	var cfgDecoder decoder
+	switch configFormat {
+	case "json":
+		cfgDecoder = json.NewDecoder(rr)
+	case "yaml,yml":
+		cfgDecoder = yaml.NewDecoder(rr)
+	default:
+		return TPLAgent{}, fmt.Errorf("unknown config format:%s", configFormat)
+	}
+
+	if err := cfgDecoder.Decode(&c); err != nil {
 		return TPLAgent{}, fatal.NewError(fmt.Errorf("config decode error:%w", err))
 	}
 	if err := Validate(&c); err != nil {
