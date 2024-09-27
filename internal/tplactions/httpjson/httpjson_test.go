@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/google/go-cmp/cmp"
+	"github.com/shubhang93/tplagent/internal/config"
 	"github.com/shubhang93/tplagent/internal/tplactions"
 	"io"
 	"net/http"
@@ -49,7 +50,10 @@ func Test_Actions(t *testing.T) {
 				Transport: mockTransport{},
 			},
 		}
-		err := a.SetConfig([]byte(`{"base_url":"http://localhost:5001","timeout":"5s"}`), tplactions.Env{})
+
+		rm := config.NewJSONRawMessage([]byte(`{"base_url":"http://localhost:5001","timeout":"5s"}`))
+
+		err := a.SetConfig(rm, tplactions.Env{})
 		if err != nil {
 			t.Error(err)
 			return
@@ -86,7 +90,10 @@ func Test_Actions(t *testing.T) {
 		a := &Actions{
 			Client: &http.Client{Transport: mockTransport{}},
 		}
-		err := a.SetConfig([]byte(`{"base_url":"http://localhost:5001","timeout":"5s"}`), tplactions.Env{})
+
+		c := config.NewJSONRawMessage([]byte(`{"base_url":"http://localhost:5001","timeout":"5s"}`))
+
+		err := a.SetConfig(c, tplactions.Env{})
 		if err != nil {
 			t.Error(err)
 			return

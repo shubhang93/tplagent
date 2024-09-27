@@ -20,7 +20,6 @@ import (
 )
 
 func Test_cli(t *testing.T) {
-	tmpDir := t.TempDir()
 	t.Run("test generate", func(t *testing.T) {
 		stdout := bytes.Buffer{}
 		expected := bytes.Buffer{}
@@ -138,6 +137,7 @@ func Test_cli(t *testing.T) {
 	})
 
 	t.Run("start agent test", func(t *testing.T) {
+		tmpDir := t.TempDir()
 		configFilePath := tmpDir + "/config.json"
 		dest := tmpDir + "/config.render"
 		ac := config.TPLAgent{Agent: config.Agent{
@@ -147,7 +147,7 @@ func Test_cli(t *testing.T) {
 			"test-config": {
 				Actions: []config.Actions{{
 					Name:   "sample",
-					Config: json.RawMessage(`{"greet_message":"Hello"}`),
+					Config: config.NewJSONRawMessage(json.RawMessage(`{"greet_message":"Hello"}`)),
 				}},
 				Raw: `Sample Render:
 Sample Action:{{ sample_greet .name -}}`,

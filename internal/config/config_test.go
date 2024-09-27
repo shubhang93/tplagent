@@ -36,12 +36,9 @@ func (s *sampleActions) FuncMap() template.FuncMap {
 	return make(template.FuncMap)
 }
 
-func (s *sampleActions) SetConfig(configJSON []byte, env tplactions.Env) error {
+func (s *sampleActions) SetConfig(decoder tplactions.ConfigDecoder, env tplactions.Env) error {
 	var sc sampleConfig
-	if len(configJSON) < 1 {
-		return nil
-	}
-	err := json.Unmarshal(configJSON, &sc)
+	err := decoder.Decode(&sc)
 	if err != nil {
 		return err
 	}
@@ -114,9 +111,9 @@ func Test_readConfig(t *testing.T) {
 					Actions: []Actions{
 						{
 							Name: "test_provider",
-							Config: json.RawMessage(`{
+							Config: NewJSONRawMessage([]byte(`{
             "key": "val"
-          }`),
+          }`)),
 						},
 					},
 				},
@@ -138,7 +135,7 @@ func Test_readConfig(t *testing.T) {
 			return
 		}
 
-		if diff := cmp.Diff(expectedConfig, c); diff != "" {
+		if diff := cmp.Diff(expectedConfig, c, cmp.AllowUnexported(RawMessage{})); diff != "" {
 			t.Errorf("(--Want ++Got):\n%s", diff)
 		}
 	})

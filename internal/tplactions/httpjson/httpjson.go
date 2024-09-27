@@ -162,11 +162,11 @@ func (a *Actions) FuncMap() template.FuncMap {
 	}
 }
 
-func (a *Actions) SetConfig(configJSON []byte, env tplactions.Env) error {
+func (a *Actions) SetConfig(decoder tplactions.ConfigDecoder, env tplactions.Env) error {
 
 	var c Config
-	if err := json.Unmarshal(configJSON, &c); err != nil {
-		return fmt.Errorf("error unmarshalling config:%w", err)
+	if err := decoder.Decode(&c); err != nil {
+		return err
 	}
 
 	a.Conf = c

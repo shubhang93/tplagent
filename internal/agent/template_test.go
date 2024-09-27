@@ -2,7 +2,6 @@ package agent
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"github.com/google/go-cmp/cmp"
 	"github.com/shubhang93/tplagent/internal/actionable"
@@ -29,13 +28,9 @@ func (t *testAction) FuncMap() template.FuncMap {
 	}
 }
 
-func (t *testAction) SetConfig(configJSON []byte, env tplactions.Env) error {
+func (t *testAction) SetConfig(decoder tplactions.ConfigDecoder, env tplactions.Env) error {
 
-	if len(configJSON) < 1 {
-		return nil
-	}
-
-	if err := json.Unmarshal(configJSON, &t.Config); err != nil {
+	if err := decoder.Decode(&t.Config); err != nil {
 		return err
 	}
 
@@ -67,7 +62,7 @@ func Test_template_helpers(t *testing.T) {
 		templ := actionable.NewTemplate("test", false)
 		err := attachActions(templ, registry, newLogger(), []config.Actions{{
 			Name:   "sample",
-			Config: nil,
+			Config: config.RawMessage{},
 		}})
 
 		if err == nil {
@@ -87,7 +82,7 @@ func Test_template_helpers(t *testing.T) {
 		templ := actionable.NewTemplate("test", false)
 		err := attachActions(templ, registry, newLogger(), []config.Actions{{
 			Name:   "sample",
-			Config: json.RawMessage(`{"gree":`),
+			Config: config.NewJSONRawMessage([]byte(`{"gree":`)),
 		}})
 		if err == nil {
 			t.Error("nil error")
@@ -109,10 +104,10 @@ func Test_template_helpers(t *testing.T) {
 
 		err := attachActions(templ, registry, newLogger(), []config.Actions{{
 			Name:   "hey",
-			Config: json.RawMessage(`{"greet_message":"hey"}`),
+			Config: config.NewJSONRawMessage([]byte(`{"greet_message":"hey"}`)),
 		}, {
 			Name:   "hello",
-			Config: json.RawMessage(`{"greet_message":"hello"}`),
+			Config: config.NewJSONRawMessage([]byte(`{"greet_message":"hello"}`)),
 		}})
 		if err != nil {
 			t.Error(err)
@@ -195,7 +190,7 @@ hello Foo`
 		err := attachActions(templ, registry, newLogger(), []config.Actions{
 			{
 				Name:   "sample",
-				Config: json.RawMessage(`{"greet_message":"heyBar"}`),
+				Config: config.NewJSONRawMessage([]byte(`{"greet_message":"heyBar"}`)),
 			}})
 
 		if err != nil {

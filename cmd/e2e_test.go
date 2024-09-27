@@ -50,7 +50,7 @@ func TestE2E(t *testing.T) {
 			"server-conf": {
 				Actions: []config.Actions{{
 					Name:   "httpjson",
-					Config: json.RawMessage(`{"base_url":"http://localhost:6000"}`),
+					Config: config.NewJSONRawMessage([]byte(`{"base_url":"http://localhost:6000"}`)),
 				}},
 				Source:      serverConfTemplate,
 				Destination: serverConfDest,

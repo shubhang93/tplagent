@@ -7,7 +7,7 @@ import (
 	"fmt"
 	gocmp "github.com/google/go-cmp/cmp"
 	"github.com/shubhang93/tplagent/internal/actionable"
-	config2 "github.com/shubhang93/tplagent/internal/config"
+	cfg "github.com/shubhang93/tplagent/internal/config"
 	"github.com/shubhang93/tplagent/internal/duration"
 	"github.com/shubhang93/tplagent/internal/fatal"
 	"github.com/shubhang93/tplagent/internal/render"
@@ -28,7 +28,7 @@ func must(err error) {
 
 func Test_makeSinkExecConfigs(t *testing.T) {
 	t.Run("paths containing env vars should get expanded", func(t *testing.T) {
-		config := map[string]*config2.TemplateSpec{
+		config := map[string]*cfg.TemplateSpec{
 			"testconfig": {
 				Source:          "$HOME/testdir",
 				Destination:     "${HOME}/testdir2",
@@ -36,22 +36,22 @@ func Test_makeSinkExecConfigs(t *testing.T) {
 				StaticData:      map[string]any{},
 				RefreshInterval: duration.Duration(1 * time.Second),
 				RenderOnce:      true,
-				Exec: &config2.ExecSpec{
+				Exec: &cfg.ExecSpec{
 					Cmd:        "echo",
 					CmdArgs:    []string{"hello"},
 					CmdTimeout: duration.Duration(5 * time.Second),
 				},
 			},
 			"testconfig2": {
-				Actions: []config2.Actions{{
+				Actions: []cfg.Actions{{
 					Name:   "httpJson",
-					Config: []byte(`{"key":"value"}`),
+					Config: cfg.NewJSONRawMessage([]byte(`{"key":"value"}`)),
 				}},
 				TemplateDelimiters: []string{"<<", ">>"},
 				HTML:               true,
 				StaticData:         map[string]any{},
 				RenderOnce:         true,
-				Exec: &config2.ExecSpec{
+				Exec: &cfg.ExecSpec{
 					Cmd:     "echo",
 					CmdArgs: []string{"hello"},
 				},
@@ -80,9 +80,9 @@ func Test_makeSinkExecConfigs(t *testing.T) {
 				sinkConfig: sinkConfig{
 					html:           true,
 					templateDelims: []string{"<<", ">>"},
-					actions: []config2.Actions{{
+					actions: []cfg.Actions{{
 						Name:   "httpJson",
-						Config: []byte(`{"key":"value"}`),
+						Config: cfg.NewJSONRawMessage([]byte(`{"key":"value"}`)),
 					}},
 					staticData: map[string]any{},
 					name:       "testconfig2",
@@ -103,7 +103,7 @@ func Test_makeSinkExecConfigs(t *testing.T) {
 		if diff := gocmp.Diff(
 			expectedConfigs,
 			seConfigs,
-			gocmp.AllowUnexported(sinkExecConfig{}, execConfig{}, sinkConfig{}),
+			gocmp.AllowUnexported(sinkExecConfig{}, execConfig{}, sinkConfig{}, cfg.RawMessage{}),
 		); diff != "" {
 			t.Errorf("(--Want ++Got)%s\n", diff)
 		}
@@ -282,9 +282,9 @@ func Test_renderLoop(t *testing.T) {
 			}, {
 				sinkConfig: sinkConfig{
 					name: "nonExistentAction",
-					actions: []config2.Actions{{
+					actions: []cfg.Actions{{
 						Name:   "fooaction",
-						Config: nil,
+						Config: cfg.RawMessage{},
 					}},
 				},
 			}}
@@ -306,7 +306,7 @@ func Test_renderLoop(t *testing.T) {
 		t.Log(err)
 	})
 
-	t.Run("test render and refresh for a valid config", func(t *testing.T) {
+	t.Run("test render and refresh for a valid cfg", func(t *testing.T) {
 
 		runFor := 5 * time.Second
 

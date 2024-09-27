@@ -1,7 +1,6 @@
 package sample
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/shubhang93/tplagent/internal/tplactions"
 	"log/slog"
@@ -24,9 +23,9 @@ func (sa *Actions) FuncMap() template.FuncMap {
 	}
 }
 
-func (sa *Actions) SetConfig(configJSON []byte, env tplactions.Env) error {
+func (sa *Actions) SetConfig(configJSON tplactions.ConfigDecoder, env tplactions.Env) error {
 	var c Config
-	if err := json.Unmarshal(configJSON, &c); err != nil {
+	if err := configJSON.Decode(&c); err != nil {
 		return err
 	}
 	sa.Config = &c

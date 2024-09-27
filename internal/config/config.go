@@ -28,8 +28,8 @@ type Agent struct {
 }
 
 type Actions struct {
-	Name   string          `json:"name" yaml:"name"`
-	Config json.RawMessage `json:"config" yaml:"config"`
+	Name   string     `json:"name" yaml:"name"`
+	Config RawMessage `json:"config" yaml:"config"`
 }
 
 type ExecSpec struct {

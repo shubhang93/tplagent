@@ -12,7 +12,7 @@ func (n noopActions) FuncMap() template.FuncMap {
 	return map[string]any{}
 }
 
-func (n noopActions) SetConfig(configJSON []byte, env Env) error {
+func (n noopActions) SetConfig(d ConfigDecoder, env Env) error {
 	return nil
 }
 

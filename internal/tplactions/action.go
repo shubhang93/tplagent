@@ -16,9 +16,13 @@ func (e Env) Get(name string) string {
 	return os.Getenv(key)
 }
 
+type ConfigDecoder interface {
+	Decode(v any) error
+}
+
 type Interface interface {
 	FuncMap() template.FuncMap
-	SetConfig(configJSON []byte, env Env) error
+	SetConfig(decoder ConfigDecoder, env Env) error
 	SetLogger(logger *slog.Logger)
 	Close()
 }
